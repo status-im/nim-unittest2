@@ -582,17 +582,17 @@ template test*(name, body) =
   else:
     {.pragma: testrunner.}
 
-  proc runTest(testSuiteName: string): int {.gensym, testrunner.} =
+  proc runTest(testSuiteName: string, testName: string): int {.gensym, testrunner.} =
     when declared(testSetupIMPLFlag):
       testSetupIMPL()
 
     ensureInitialized()
 
-    if shouldRun(testSuiteName, name):
+    if shouldRun(testSuiteName, testName):
       checkpoints = @[]
       var testStatusIMPL {.inject.} = OK
 
-      testStarted(name)
+      testStarted(testName)
 
       try:
         body
@@ -609,7 +609,7 @@ template test*(name, body) =
           programResult += 1
         let testResult = TestResult(
           suiteName: testSuiteName,
-          testName: name,
+          testName: testName,
           status: testStatusIMPL
         )
         testEnded(testResult)
@@ -619,9 +619,9 @@ template test*(name, body) =
 
   let optionalTestSuiteName = when declared(testSuiteName): testSuiteName else: ""
   when paralleliseTests:
-    flowVars.add(spawn runTest(optionalTestSuiteName))
+    flowVars.add(spawn runTest(optionalTestSuiteName, name))
   else:
-    discard runTest(optionalTestSuiteName)
+    discard runTest(optionalTestSuiteName, name)
 
 proc checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
