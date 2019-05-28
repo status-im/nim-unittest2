@@ -103,19 +103,11 @@ suite "suite #1":
     sleep(300)
     check 1 == 1
 
+# change the output formatter just for the next suite
+clearOutputFormatters()
+addOutputFormatter(newConsoleOutputFormatter(colorOutput=false))
+
 suite "suite #2":
-  setup:
-    # only here can we set formatters when running the tests in parallel
-    # (this setup will be executed for each test, so it may run multiple times
-    # in the same thread, hence the clearing of the threadvar before adding to it)
-    clearOutputFormatters()
-    addOutputFormatter(newConsoleOutputFormatter(PRINT_FAILURES, colorOutput=false))
-
-  teardown:
-    # we don't want the custom formatter to remain in worker threads after this
-    # suite is done
-    clearOutputFormatters()
-
   test "suite #2, test #1":
     sleep(200)
     check 1 == 1
@@ -123,6 +115,9 @@ suite "suite #2":
   test "suite #2, test #2":
     sleep(100)
     check 1 == 1
+
+# go back to the default one
+clearOutputFormatters()
 
 test "independent test #6":
   sleep(200)

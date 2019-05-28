@@ -69,22 +69,6 @@
 ##   # or
 ##   NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim
 ##
-## Since output formatters are kept in a threadvar, they need to be initialised
-## for each thread in the thread pool. This means that customisation can only be
-## done in a suite's "setup" section, which will run before each test in that
-## suite - hence the need to clear existing formatters before adding new ones:
-##
-## .. code:: nim
-##
-##  suite "custom formatter":
-##    setup:
-##      clearOutputFormatters()
-##      addOutputFormatter(newConsoleOutputFormatter(PRINT_FAILURES, colorOutput=false))
-##
-##    # if you need to revert back to the default after the suite
-##    teardown:
-##      clearOutputFormatters()
-##
 ## There are some implicit barriers where we wait for all the spawned jobs to
 ## complete: before and after each test suite and at the main thread's exit.
 ##
@@ -124,8 +108,7 @@
 ##
 ##     echo "suite teardown: run once after the tests"
 
-import
-  macros, strutils, streams, times, sets
+import locks, macros, sets, strutils, streams, times
 
 when declared(stdout):
   import os
@@ -148,6 +131,7 @@ when paralleliseTests:
   # counter increased back to the pre-call value) so we're stuck with these
   # dummy flowvars
   # (`flowVars` will be initialized in each child thread, when using nested tests, by the compiler)
+  # TODO: try getting rid of them when nim-0.20.0 is released
   var flowVars {.threadvar.}: seq[FlowVarBase]
   proc repeatableSync() =
     sync()
@@ -223,12 +207,17 @@ var
                                     ## the non-js target.
 
   checkpoints {.threadvar.}: seq[string]
-  formatters {.threadvar.}: seq[OutputFormatter]
-  testsFilters {.threadvar.}: HashSet[string]
+  formattersLock: Lock
+  formatters {.guard: formattersLock.}: seq[OutputFormatter]
+  testFiltersLock: Lock
+  testsFilters {.guard: testFiltersLock.}: HashSet[string]
   disabledParamFiltering: bool
 
 when declared(stdout):
   abortOnError = existsEnv("NIMTEST_ABORT_ON_ERROR")
+
+initLock(formattersLock)
+initLock(testFiltersLock)
 
 method suiteStarted*(formatter: OutputFormatter, suiteName: string) {.base, gcsafe.} =
   discard
@@ -244,10 +233,14 @@ method suiteEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
   discard
 
 proc clearOutputFormatters*() =
-  formatters = @[]
+  withLock formattersLock:
+    {.gcsafe.}:
+      formatters = @[]
 
 proc addOutputFormatter*(formatter: OutputFormatter) =
-  formatters.add(formatter)
+  withLock formattersLock:
+    {.gcsafe.}:
+      formatters.add(formatter)
 
 proc newConsoleOutputFormatter*(outputLevel: OutputLevel = PRINT_ALL,
                                 colorOutput = true): ConsoleOutputFormatter =
@@ -449,49 +442,63 @@ when defined(testing): export matchFilter
 proc shouldRun(currentSuiteName, testName: string): bool =
   ## Check if a test should be run by matching suiteName and testName against
   ## test filters.
-  if testsFilters.len == 0:
-    return true
+  withLock testFiltersLock:
+    {.gcsafe.}:
+      if testsFilters.len == 0:
+        return true
 
-  for f in testsFilters:
-    if matchFilter(currentSuiteName, testName, f):
-      return true
+      for f in testsFilters:
+        if matchFilter(currentSuiteName, testName, f):
+          return true
 
   return false
 
 proc ensureInitialized() =
-  if formatters.len == 0:
-    formatters = @[OutputFormatter(defaultConsoleFormatter())]
+  withLock formattersLock:
+    {.gcsafe.}:
+      if formatters.len == 0:
+        formatters = @[OutputFormatter(defaultConsoleFormatter())]
 
-  if not disabledParamFiltering and not testsFilters.isValid:
-    testsFilters.init()
-    when declared(paramCount):
-      # Read tests to run from the command line.
-      for i in 1 .. paramCount():
-        testsFilters.incl(paramStr(i))
+  withLock testFiltersLock:
+    {.gcsafe.}:
+      if not disabledParamFiltering and not testsFilters.isValid:
+        testsFilters.init()
+        when declared(paramCount):
+          # Read tests to run from the command line.
+          for i in 1 .. paramCount():
+            testsFilters.incl(paramStr(i))
 
 proc suiteStarted(name: string) =
   when paralleliseTests:
     repeatableSync() # wait for any independent tests from the threadpool before starting the suite
-  for formatter in formatters:
-    formatter.suiteStarted(name)
+  withLock formattersLock:
+    {.gcsafe.}:
+      for formatter in formatters:
+        formatter.suiteStarted(name)
 
 proc suiteEnded() =
   when paralleliseTests:
     repeatableSync() # wait for a suite's tests from the threadpool before moving on to the next suite
-  for formatter in formatters:
-    formatter.suiteEnded()
+  withLock formattersLock:
+    {.gcsafe.}:
+      for formatter in formatters:
+        formatter.suiteEnded()
 
 proc testStarted(name: string) =
-  for formatter in formatters:
-    formatter.testStarted(name)
+  withLock formattersLock:
+    {.gcsafe.}:
+      for formatter in formatters:
+        formatter.testStarted(name)
 
 proc testEnded(testResult: TestResult) =
-  for formatter in formatters:
-    when paralleliseTests:
-      withLock outputLock:
-        formatter.testEnded(testResult)
-    else:
-      formatter.testEnded(testResult)
+  withLock formattersLock:
+    {.gcsafe.}:
+      for formatter in formatters:
+        when paralleliseTests:
+          withLock outputLock:
+            formatter.testEnded(testResult)
+        else:
+          formatter.testEnded(testResult)
 
 template suite*(name, body) {.dirty.} =
   ## Declare a test suite identified by `name` with optional ``setup``
@@ -648,12 +655,13 @@ template fail* =
 
   ensureInitialized()
 
-    # var stackTrace: string = nil
-  for formatter in formatters:
-    when declared(stackTrace):
-      formatter.failureOccurred(checkpoints, stackTrace)
-    else:
-      formatter.failureOccurred(checkpoints, "")
+  withLock formattersLock:
+    {.gcsafe.}:
+      for formatter in formatters:
+        when declared(stackTrace):
+          formatter.failureOccurred(checkpoints, stackTrace)
+        else:
+          formatter.failureOccurred(checkpoints, "")
 
   when not defined(ECMAScript):
     if abortOnError:
