@@ -1426,15 +1426,7 @@ nim c -r test 'bug #*::' '::#*'</pre>
 <pre class="listing">
 nim c -r --threads:on -d:nimtestParallel testfile.nim
 # or
-NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>Since output formatters are kept in a threadvar, they need to be initialised for each thread in the thread pool. This means that customisation can only be done in a suite's &quot;setup&quot; section, which will run before each test in that suite - hence the need to clear existing formatters before adding new ones:</p>
-<pre class="listing"><span class="Identifier">suite</span> <span class="StringLit">&quot;custom formatter&quot;</span><span class="Punctuation">:</span>
-  <span class="Identifier">setup</span><span class="Punctuation">:</span>
-    <span class="Identifier">clearOutputFormatters</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-    <span class="Identifier">addOutputFormatter</span><span class="Punctuation">(</span><span class="Identifier">newConsoleOutputFormatter</span><span class="Punctuation">(</span><span class="Identifier">PRINT_FAILURES</span><span class="Punctuation">,</span> <span class="Identifier">colorOutput</span><span class="Operator">=</span><span class="Identifier">false</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
-  
-  <span class="Comment"># if you need to revert back to the default after the suite</span>
-  <span class="Identifier">teardown</span><span class="Punctuation">:</span>
-    <span class="Identifier">clearOutputFormatters</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre><p>There are some implicit barriers where we wait for all the spawned jobs to complete: before and after each test suite and at the main thread's exit.</p>
+NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some implicit barriers where we wait for all the spawned jobs to complete: before and after each test suite and at the main thread's exit.</p>
 <p>The suite-related barriers are there to avoid mixing test output, but they also affect which groups of tests can be run in parallel, so keep them in mind when deciding how many tests to place in different suites (or between suites).</p>
 
 <h2><a class="toc-backref" id="running-tests-in-parallel-example" href="#running-tests-in-parallel-example">Example</a></h2><pre class="listing"><span class="Identifier">suite</span> <span class="StringLit">&quot;description for this stuff&quot;</span><span class="Punctuation">:</span>
@@ -1461,7 +1453,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>Since output forma
     <span class="Identifier">expect</span><span class="Punctuation">(</span><span class="Identifier">IndexError</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
       <span class="Keyword">discard</span> <span class="Identifier">v</span><span class="Punctuation">[</span><span class="DecNumber">4</span><span class="Punctuation">]</span>
   
-  <span class="Identifier">echo</span> <span class="StringLit">&quot;suite teardown: run once after the tests&quot;</span></pre></p>
+  <span class="Identifier">suiteTeardown</span><span class="Punctuation">:</span>
+    <span class="Identifier">echo</span> <span class="StringLit">&quot;suite teardown: run once after the tests&quot;</span></pre></p>
   <div class="section" id="7">
 <h1><a class="toc-backref" href="#7">Types</a></h1>
 <dl class="item">
@@ -1826,7 +1819,7 @@ Same as <cite>check</cite> except any failed test causes the program to quit imm
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small>Made with Nim. Generated: 2019-05-19 21:00:28 UTC</small>
+        <small>Made with Nim. Generated: 2019-05-28 21:58:58 UTC</small>
       </div>
     </div>
   </div>
