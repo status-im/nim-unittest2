@@ -574,9 +574,6 @@ template test*(name, body) =
     {.pragma: testrunner.}
 
   proc runTest(testSuiteName: string): int {.gensym, testrunner.} =
-    # when running tests in parallel, the only place we can use
-    # addOutputFormatter() is in a suite's setup(), so we need to run it before
-    # ensureInitialized()
     when declared(testSetupIMPLFlag):
       testSetupIMPL()
 
