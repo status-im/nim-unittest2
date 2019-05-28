@@ -106,7 +106,8 @@
 ##       expect(IndexError):
 ##         discard v[4]
 ##
-##     echo "suite teardown: run once after the tests"
+##     suiteTeardown:
+##       echo "suite teardown: run once after the tests"
 
 import locks, macros, sets, strutils, streams, times
 
@@ -133,7 +134,7 @@ when paralleliseTests:
   # (`flowVars` will be initialized in each child thread, when using nested tests, by the compiler)
   # TODO: try getting rid of them when nim-0.20.0 is released
   var flowVars {.threadvar.}: seq[FlowVarBase]
-  proc repeatableSync() =
+  proc repeatableSync*() =
     sync()
     for flowVar in flowVars:
       blockUntil(flowVar)
@@ -540,12 +541,20 @@ template suite*(name, body) {.dirty.} =
       var testTeardownIMPLFlag {.used.} = true
       template testTeardownIMPL: untyped {.dirty.} = teardownBody
 
+    template suiteTeardown(suiteTeardownBody: untyped) {.dirty, used.} =
+      var testSuiteTeardownIMPLFlag {.used.} = true
+      template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
+
     let testSuiteName {.used.} = name
 
     ensureInitialized()
     try:
       suiteStarted(name)
       body
+      when declared(testSuiteTeardownIMPLFlag):
+        when paralleliseTests:
+          repeatableSync()
+        testSuiteTeardownIMPL()
     finally:
       suiteEnded()
 
@@ -605,8 +614,6 @@ template test*(name, body) =
         )
         testEnded(testResult)
         checkpoints = @[]
-        # when running tests in parallel, "formatters" manipulation may occur in
-        # teardown(), so it needs to be after testEnded()
         when declared(testTeardownIMPLFlag):
           testTeardownIMPL()
 

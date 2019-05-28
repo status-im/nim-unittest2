@@ -116,6 +116,11 @@ suite "suite #2":
     sleep(100)
     check 1 == 1
 
+  suiteTeardown:
+    echo "suite teardown"
+
+  echo "this will be shown first"
+
 # go back to the default one
 clearOutputFormatters()
 
