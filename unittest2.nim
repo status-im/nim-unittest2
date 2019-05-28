@@ -591,6 +591,7 @@ template test*(name, body) =
     if shouldRun(testSuiteName, testName):
       checkpoints = @[]
       var testStatusIMPL {.inject.} = OK
+      let testName {.inject.} = testName
 
       testStarted(testName)
 
