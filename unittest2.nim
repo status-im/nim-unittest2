@@ -578,7 +578,10 @@ template test*(name, body) =
 
   # `gensym` can't be in here because it's not a first-class pragma
   when paralleliseTests:
-    {.pragma: testrunner, gcsafe.}
+    # We use "fastcall" to get proper error messages about variable access that
+    # would make runTest() a closure - which we can't have in a spawned proc.
+    # "nimcall" doesn't work here, because of https://github.com/nim-lang/Nim/issues/8473
+    {.pragma: testrunner, gcsafe, fastcall.}
   else:
     {.pragma: testrunner.}
 
