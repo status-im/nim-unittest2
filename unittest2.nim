@@ -77,6 +77,10 @@
 ## mind when deciding how many tests to place in different suites (or between
 ## suites).
 ##
+## You may sometimes need to disable test parallelisation for a specific test,
+## even though it was enabled in some configuration file in a parent dir. Do
+## this with "-d:nimtestParallelDisabled" which overrides everything else.
+##
 ## Example
 ## -------
 ##
@@ -118,7 +122,7 @@ when not defined(ECMAScript):
   import terminal
 
 when declared(stdout):
-  const paralleliseTests* = existsEnv("NIMTEST_PARALLEL") or defined(nimtestParallel)
+  const paralleliseTests* = (existsEnv("NIMTEST_PARALLEL") or defined(nimtestParallel) and not defined(nimtestParallelDisabled))
     ## Whether parallel test running was enabled (set at compile time).
     ## This constant might be useful in custom output formatters.
 else:
