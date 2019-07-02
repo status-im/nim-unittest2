@@ -129,7 +129,7 @@ else:
   const paralleliseTests* = false
 
 when paralleliseTests:
-  import threadpool, locks
+  import threadpool
 
   # repeatedly calling sync() without waiting for results - on procs that don't
   # return any - doesn't work properly (probably due to gSomeReady getting its
