@@ -1,5 +1,3 @@
-## description
-
 **unittest2** started as a [pull request](https://github.com/nim-lang/Nim/pull/9724) to evolve the [unittest](https://nim-lang.org/docs/unittest.html) module in the [Nim](https://nim-lang.org/). It has since grown into a separate library.
 
 Features of `unittest2` include:
@@ -44,15 +42,14 @@ suite "Suites can be used to group tests":
 * Replace `import unittest` with `import unittest2`
 * `unittest2` places each test in a separate `proc` which changes the way templates inside tests are interpreted - some code changes may be necessary
 
-## license
+## License
 
 MIT
 
-## credits
+## Credits
 
 - original author: Zahary Karadjov
 
 - fork author: Ștefan Talpalaru \<stefantalpalaru@yahoo.com\>
 
 - homepage: https://github.com/status-im/nim-unittest2
-
