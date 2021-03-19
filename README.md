@@ -1,11 +1,11 @@
 ## Introduction
 
-**unittest2** started as a [pull request](https://github.com/nim-lang/Nim/pull/9724) to evolve the [unittest](https://nim-lang.org/docs/unittest.html) module in the [Nim](https://nim-lang.org/). It has since grown into a separate library.
+**unittest2** started as a [pull request](https://github.com/nim-lang/Nim/pull/9724) to evolve the [unittest](https://nim-lang.org/docs/unittest.html) module in [Nim](https://nim-lang.org/). It has since grown into a separate library.
 
 Features of `unittest2` include:
 
 * [Parallel test execution](https://status-im.github.io/nim-unittest2/unittest2.html#running-tests-in-parallel)
-* Test separation with each test running in its own stack
+* Test separation with each test running in its own procedure
 * Strict exception handling with support for [exception tracking](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking)
 
 ## Installing
@@ -43,7 +43,6 @@ suite "Suites can be used to group tests":
 ```text
 nimble test
 ```
-
 
 ## License
 
