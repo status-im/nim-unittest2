@@ -4,7 +4,7 @@
 
 Features of `unittest2` include:
 
-* [parallel test execution](https://status-im.github.io/nim-unittest2/unittest2.html#running-tests-in-parallel)
+* [Parallel test execution](https://status-im.github.io/nim-unittest2/unittest2.html#running-tests-in-parallel)
 * Test separation with each test running in its own stack
 * Strict exception handling with support for [exception tracking](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking)
 
