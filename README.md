@@ -51,7 +51,8 @@ See the [tests](./tests) for more examples!
 ## Testing `unittest2`
 
 ```text
-nimble test
+# this calls a task in "config.nims"
+nim test
 ```
 
 ## License
