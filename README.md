@@ -8,12 +8,6 @@ Features of `unittest2` include:
 * Test separation with each test running in its own stack
 * Strict exception handling with support for [exception tracking](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking)
 
-## Testing
-
-```text
-nimble test
-```
-
 ## Installing
 
 ```text
@@ -39,10 +33,17 @@ suite "Suites can be used to group tests":
 
 ```
 
-## Porting from `unittest`
+## Porting code from `unittest`
 
 * Replace `import unittest` with `import unittest2`
 * `unittest2` places each test in a separate `proc` which changes the way templates inside tests are interpreted - some code changes may be necessary
+
+## Testing `unittest2`
+
+```text
+nimble test
+```
+
 
 ## License
 
