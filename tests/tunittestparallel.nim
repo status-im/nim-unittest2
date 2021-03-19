@@ -104,7 +104,7 @@ suite "suite #1":
     check 1 == 1
 
 # change the output formatter just for the next suite
-clearOutputFormatters()
+resetOutputFormatters()
 addOutputFormatter(newConsoleOutputFormatter(colorOutput=false))
 
 suite "suite #2":
@@ -122,7 +122,7 @@ suite "suite #2":
   echo "this will be shown first"
 
 # go back to the default one
-clearOutputFormatters()
+resetOutputFormatters()
 
 test "independent test #6":
   sleep(200)
