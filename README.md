@@ -1,3 +1,5 @@
+## Introduction
+
 **unittest2** started as a [pull request](https://github.com/nim-lang/Nim/pull/9724) to evolve the [unittest](https://nim-lang.org/docs/unittest.html) module in the [Nim](https://nim-lang.org/). It has since grown into a separate library.
 
 Features of `unittest2` include:
