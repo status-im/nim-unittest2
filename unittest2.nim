@@ -149,7 +149,10 @@ when paralleliseTests:
   proc repeatableSync*() =
     sync()
     for flowVar in flowVars:
-      blockUntil(flowVar)
+      when (NimMajor, NimMinor, NimPatch) >= (1, 4, 0):
+        blockUntil(flowVar[])
+      else:
+        blockUntil(flowVar)
     flowVars = @[]
 
   # make sure all the spawned tests are done before exiting
@@ -230,6 +233,9 @@ const
   nimUnittestOutputLevel {.strdefine.} = $outputLevelDefault
   nimUnittestColor {.strdefine.} = "auto" ## auto|on|off
   nimUnittestAbortOnError {.booldefine.} = false
+
+initLock(formattersLock)
+initLock(testFiltersLock)
 
 template deprecateEnvVarHere() =
   # xxx issue a runtime warning to deprecate this envvar.
@@ -554,7 +560,9 @@ proc testStarted(name: string) =
   withLock formattersLock:
     {.gcsafe.}:
       for formatter in formatters:
-        formatter.testStarted(name)
+        if not formatter.isNil:
+          # Useless check that somehow prevents a method dispatch failure on macOS
+          formatter.testStarted(name)
 
 proc testEnded(testResult: TestResult) =
   withLock formattersLock:
@@ -639,7 +647,10 @@ template test*(name, body) =
   ## .. code-block::
   ##
   ##  [OK] roses are red
-  bind shouldRun, checkpoints, formatters, ensureInitialized, testEnded, exceptionTypeName
+  bind shouldRun, checkpoints, ensureInitialized, testEnded, exceptionTypeName
+  withLock formattersLock:
+    {.gcsafe.}:
+      bind formatters
 
   # `gensym` can't be in here because it's not a first-class pragma
   when paralleliseTests:
