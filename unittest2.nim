@@ -687,7 +687,7 @@ template test*(name, body) =
 
     finally:
       if testStatusIMPL == TestStatus.FAILED:
-        programResult += 1
+        programResult = 1
       let testResult = TestResult(
         suiteName: testSuiteName,
         testName: name,
@@ -734,7 +734,7 @@ template fail* =
   when declared(testStatusIMPL):
     testStatusIMPL = TestStatus.FAILED
   else:
-    setProgramResult 1
+    programResult = 1
 
   ensureInitialized()
 
