@@ -483,7 +483,7 @@ proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [Exception].} =
 
   let timeStr = counts[4].formatFloat(ffDecimal, precision = 6)
 
-  s.writeLine("\t" & """<testsuite name="$1" tests="$2" failures="$3" errors="$4" skipped="$5" time="%6">""" % [
+  s.writeLine("\t" & """<testsuite name="$1" tests="$2" failures="$3" errors="$4" skipped="$5" time="$6">""" % [
     xmlEscape(suite.name), $counts[0], $counts[1], $counts[2], $counts[3], timeStr])
 
   for test in suite.tests.items():
@@ -730,8 +730,8 @@ template test*(name, body) =
       when declared(testSetupIMPLFlag): testSetupIMPL()
       when declared(testTeardownIMPLFlag):
         defer: testTeardownIMPL()
-
-      body
+      block:
+        body
 
     except Exception as e: # This will also catch Defect which may or may not work
       let eTypeDesc = "[" & exceptionTypeName(e) & "]"
