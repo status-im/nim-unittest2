@@ -690,7 +690,7 @@ template suite*(name, body) {.dirty.} =
 
 template exceptionTypeName(e: typed): string = $e.name
 
-template test*(name, body) =
+template test*(name: string, body: untyped) =
   ## Define a single test case identified by `name`.
   ##
   ## .. code-block:: nim
@@ -704,10 +704,7 @@ template test*(name, body) =
   ## .. code-block::
   ##
   ##  [OK] roses are red
-  bind shouldRun, checkpoints, testEnded, exceptionTypeName
-  withLock formattersLock:
-    {.gcsafe.}:
-      bind formatters
+  bind shouldRun, checkpoints, testStarted, testEnded, exceptionTypeName
 
   # `gensym` can't be in here because it's not a first-class pragma
   when paralleliseTests:
@@ -747,7 +744,7 @@ template test*(name, body) =
         programResult = 1
       let testResult = TestResult(
         suiteName: testSuiteName,
-        testName: name,
+        testName: testName,
         status: testStatusIMPL,
         duration: getMonoTime() - startTime
       )
@@ -755,11 +752,12 @@ template test*(name, body) =
       checkpoints = @[]
 
   let optionalTestSuiteName = when declared(testSuiteName): testSuiteName else: ""
-  if shouldRun(optionalTestSuiteName, name):
+  let tname = name
+  if shouldRun(optionalTestSuiteName, tname):
     when paralleliseTests:
-      flowVars.add(spawn runTest(optionalTestSuiteName, name))
+      flowVars.add(spawn runTest(optionalTestSuiteName, tname))
     else:
-      discard runTest(optionalTestSuiteName, name)
+      discard runTest(optionalTestSuiteName, tname)
 
 proc checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
