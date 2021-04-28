@@ -118,6 +118,16 @@
 ##
 ##     suiteTeardown:
 ##       echo "suite teardown: run once after the tests"
+##
+## Command line arguments
+## ======================
+##
+## --help      Print short help and quit
+## --xml:file  Write JUnit-compatible XML report to `file`
+## --console   Write report to the console (default, when no other output is
+##             selected)
+##
+## Command line parsing can be disabled with `-d:nimtestDisableParamFiltering`.
 
 import std/[locks, macros, sets, strutils, streams, times, monotimes]
 
@@ -125,6 +135,11 @@ when declared(stdout):
   import std/os
 
 const useTerminal = not defined(js)
+
+# compile with `-d:nimtestDisableParamFiltering` to skip parsing test filters,
+# `--help` and other command line options - you can manually call
+# `parseParameters` instead then.
+const autoParseArgs = not defined(nimtestDisableParamFiltering)
 
 when useTerminal:
   import std/terminal
@@ -565,36 +580,37 @@ proc cleanupFormatters() {.noconv.} =
     for f in formatters.mitems():
       testRunEnded(f)
 
-proc ensureInitialized() =
+proc parseParameters*(args: openArray[string]) =
   withLock testFiltersLock:
     withLock formattersLock:
-      {.gcsafe.}:
-        if not disabledParamFiltering:
-          when declared(paramCount):
-            # Read tests to run from the command line.
-            for i in 1 .. paramCount():
-              let str = paramStr(i)
-              if str.startsWith("--help"):
-                echo "Usage: [--xml=file.xml] [--console] [test-name-glob]"
-                quit 0
-              elif str.startsWith("--xml"):
-                let fn = str[("--xml".len + 1)..^1] # skip separator char as well
-                try:
-                  formatters.add(newJUnitOutputFormatter(
-                    newFileStream(fn, fmWrite)))
-                except CatchableError as exc:
-                  echo "Cannot open ", fn, " for writing: ", exc.msg
-                  quit 1
-              elif str.startsWith("--console"):
-                formatters.add(defaultConsoleFormatter())
-              else:
-                testsFilters.incl(str)
-
-        if formatters.len == 0:
-          # no need for cleanup of console formatter
-          formatters = @[OutputFormatter(defaultConsoleFormatter())]
+      # Read tests to run from the command line.
+      for str in args:
+        if str.startsWith("--help"):
+          echo "Usage: [--xml=file.xml] [--console] [test-name-glob]"
+          quit 0
+        elif str.startsWith("--xml"):
+          let fn = str[("--xml".len + 1)..^1] # skip separator char as well
+          try:
+            formatters.add(newJUnitOutputFormatter(
+              newFileStream(fn, fmWrite)))
+          except CatchableError as exc:
+            echo "Cannot open ", fn, " for writing: ", exc.msg
+            quit 1
+        elif str.startsWith("--console"):
+          formatters.add(defaultConsoleFormatter())
         else:
-          addQuitProc(cleanupFormatters)
+          testsFilters.incl(str)
+
+proc ensureInitialized() =
+  if autoParseArgs and declared(paramCount):
+    parseParameters(commandLineParams())
+
+  withLock formattersLock:
+    if formatters.len == 0:
+      formatters = @[OutputFormatter(defaultConsoleFormatter())]
+
+  # Best-effort attempt to close formatters after the last test has run
+  addQuitProc(cleanupFormatters)
 
 ensureInitialized() # Run once!
 
@@ -957,6 +973,6 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
 
   result = getAst(expectBody(errorTypes, errorTypes.lineInfo, body))
 
-proc disableParamFiltering* =
-  ## disables filtering tests with the command line params
-  disabledParamFiltering = true
+proc disableParamFiltering* {.deprecated:
+    "Compile with -d:nimtestDisableParamFiltering instead".} =
+  discard
