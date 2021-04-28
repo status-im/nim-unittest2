@@ -118,13 +118,28 @@
 ##
 ##     suiteTeardown:
 ##       echo "suite teardown: run once after the tests"
+##
+## Command line arguments
+## ======================
+##
+## --help      Print short help and quit
+## --xml:file  Write JUnit-compatible XML report to `file`
+## --console   Write report to the console (default, when no other output is
+##             selected)
+##
+## Command line parsing can be disabled with `-d:nimtestDisableParamFiltering`.
 
-import std/[locks, macros, sets, strutils, streams, times]
+import std/[locks, macros, sets, strutils, streams, times, monotimes]
 
 when declared(stdout):
   import std/os
 
 const useTerminal = not defined(js)
+
+# compile with `-d:nimtestDisableParamFiltering` to skip parsing test filters,
+# `--help` and other command line options - you can manually call
+# `parseParameters` instead then.
+const autoParseArgs = not defined(nimtestDisableParamFiltering)
 
 when useTerminal:
   import std/terminal
@@ -185,6 +200,7 @@ type
     testName*: string
       ## Name of the test case
     status*: TestStatus
+    duration*: Duration # How long the test took, in seconds
 
   OutputFormatter* = ref object of RootObj
 
@@ -207,11 +223,21 @@ type
     isInSuite: bool
     isInTest: bool
 
+  JUnitTest = object
+    name: string
+    result: TestResult
+    error: (seq[string], string)
+    failures: seq[seq[string]]
+
+  JUnitSuite = object
+    name: string
+    tests: seq[JUnitTest]
+
   JUnitOutputFormatter* = ref object of OutputFormatter
     stream: Stream
-    testErrors: seq[string]
-    testStartTime: float
-    testStackTrace: string
+    defaultSuite: JUnitSuite
+    suites: seq[JUnitSuite]
+    currentSuite: int
 
 var
   abortOnError* {.threadvar.}: bool ## Set to true in order to quit
@@ -259,6 +285,11 @@ method failureOccurred*(formatter: OutputFormatter, checkpoints: seq[string],
 method testEnded*(formatter: OutputFormatter, testResult: TestResult) {.base, gcsafe.} =
   discard
 method suiteEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
+  discard
+method testRunEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
+  # Runs when the test executable is about to end, which is implemented using
+  # addQuitProc, a best-effort kind of place to do cleanups
+
   discard
 
 proc addOutputFormatter*(formatter: OutputFormatter) =
@@ -383,95 +414,113 @@ proc newJUnitOutputFormatter*(stream: Stream): JUnitOutputFormatter =
   ## You should invoke formatter.close() to finalize the report.
   result = JUnitOutputFormatter(
     stream: stream,
-    testErrors: @[],
-    testStackTrace: "",
-    testStartTime: 0.0
+    defaultSuite: JUnitSuite(name: "default"),
+    currentSuite: -1,
   )
   try:
     stream.writeLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-    stream.writeLine("<testsuites>")
   except CatchableError as exc:
     echo "Cannot write JUnit: ", exc.msg
     quit 1
 
-proc close*(formatter: JUnitOutputFormatter) =
-  ## Completes the report and closes the underlying stream.
-  try:
-    formatter.stream.writeLine("</testsuites>")
-    formatter.stream.close()
-  except Exception as exc: # Work around Exception raised in stream
-    echo "Cannot write JUnit: ", exc.msg
-    quit 1
+template suite(formatter: JUnitOutputFormatter): untyped =
+  if formatter.currentSuite == -1:
+    addr formatter.defaultSuite
+  else:
+    addr formatter.suites[formatter.currentSuite]
 
 method suiteStarted*(formatter: JUnitOutputFormatter, suiteName: string) =
-  try:
-    formatter.stream.writeLine("\t<testsuite name=\"$1\">" % xmlEscape(suiteName))
-  except CatchableError as exc:
-    echo "Cannot write JUnit: ", exc.msg
-    quit 1
+  formatter.currentSuite = formatter.suites.len()
+  formatter.suites.add(JUnitSuite(name: suiteName))
 
 method testStarted*(formatter: JUnitOutputFormatter, testName: string) =
-  formatter.testErrors.setLen(0)
-  formatter.testStackTrace.setLen(0)
-  formatter.testStartTime = epochTime()
+  formatter.suite().tests.add(JUnitTest(name: testName))
 
 method failureOccurred*(formatter: JUnitOutputFormatter,
                         checkpoints: seq[string], stackTrace: string) =
   ## ``stackTrace`` is provided only if the failure occurred due to an exception.
   ## ``checkpoints`` is never ``nil``.
-  formatter.testErrors.add(checkpoints)
   if stackTrace.len > 0:
-    formatter.testStackTrace = stackTrace
+    formatter.suite().tests[^1].error = (checkpoints, stackTrace)
+  else:
+    formatter.suite().tests[^1].failures.add(checkpoints)
 
 method testEnded*(formatter: JUnitOutputFormatter, testResult: TestResult) =
-  let time = epochTime() - formatter.testStartTime
-  let timeStr = time.formatFloat(ffDecimal, precision = 8)
-  try:
-    formatter.stream.writeLine("\t\t<testcase name=\"$#\" time=\"$#\">" % [
-        xmlEscape(testResult.testName), timeStr])
-    case testResult.status
+  formatter.suite().tests[^1].result = testResult
+
+method suiteEnded*(formatter: JUnitOutputFormatter) =
+  formatter.currentSuite = -1
+
+func toFloatSeconds(duration: Duration): float64 =
+  duration.inNanoseconds().float64 / 1_000_000_000.0
+
+proc writeTest(s: Stream, test: JUnitTest) {.raises: [Exception].} =
+  let
+    time = test.result.duration.toFloatSeconds()
+    timeStr = time.formatFloat(ffDecimal, precision = 6)
+
+  s.writeLine("\t\t<testcase name=\"$#\" time=\"$#\">" % [
+      xmlEscape(test.name), timeStr])
+  case test.result.status
+  of TestStatus.OK:
+    discard
+  of TestStatus.SKIPPED:
+    s.writeLine("\t\t\t<skipped />")
+  of TestStatus.FAILED:
+    if test.error[0].len > 0:
+      s.writeLine("\t\t\t<error message=\"$#\">$#</error>" % [
+          xmlEscape(join(test.error[0], "\n")), xmlEscape(test.error[1])])
+
+    for failure in test.failures:
+      s.writeLine("\t\t\t<failure message=\"$#\">$#</failure>" %
+          [xmlEscape(failure[^1]), xmlEscape(join(failure[0..^2], "\n"))])
+
+  s.writeLine("\t\t</testcase>")
+
+proc countTests(counts: var (int, int, int, int, float), suite: JUnitSuite) =
+  counts[0] += suite.tests.len()
+  for test in suite.tests:
+    counts[4] += test.result.duration.toFloatSeconds()
+    case test.result.status
     of TestStatus.OK:
       discard
     of TestStatus.SKIPPED:
-      formatter.stream.writeLine("<skipped />")
+      counts[3] += 1
     of TestStatus.FAILED:
-      let failureMsg = if formatter.testStackTrace.len > 0 and
-                          formatter.testErrors.len > 0:
-                        xmlEscape(formatter.testErrors[^1])
-                      elif formatter.testErrors.len > 0:
-                        xmlEscape(formatter.testErrors[0])
-                      else: "The test failed without outputting an error"
-
-      var errs = ""
-      if formatter.testErrors.len > 1:
-        var startIdx = if formatter.testStackTrace.len > 0: 0 else: 1
-        var endIdx = if formatter.testStackTrace.len > 0:
-                        formatter.testErrors.len - 2
-                      else: formatter.testErrors.len - 1
-
-        for errIdx in startIdx..endIdx:
-          if errs.len > 0:
-            errs.add("\n")
-          errs.add(xmlEscape(formatter.testErrors[errIdx]))
-
-      if formatter.testStackTrace.len > 0:
-        formatter.stream.writeLine("\t\t\t<error message=\"$#\">$#</error>" % [
-            failureMsg, xmlEscape(formatter.testStackTrace)])
-        if errs.len > 0:
-          formatter.stream.writeLine("\t\t\t<system-err>$#</system-err>" % errs)
+      if test.error[0].len > 0:
+        counts[2] += 1
       else:
-        formatter.stream.writeLine("\t\t\t<failure message=\"$#\">$#</failure>" %
-            [failureMsg, errs])
+        counts[1] += 1
 
-    formatter.stream.writeLine("\t\t</testcase>")
-  except CatchableError as exc:
-    echo "Cannot write JUnit: ", exc.msg
-    quit 1
+proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [Exception].} =
+  var counts: (int, int, int, int, float)
+  countTests(counts, suite)
 
-method suiteEnded*(formatter: JUnitOutputFormatter) =
+  let timeStr = counts[4].formatFloat(ffDecimal, precision = 6)
+
+  s.writeLine("\t" & """<testsuite name="$1" tests="$2" failures="$3" errors="$4" skipped="$5" time="$6">""" % [
+    xmlEscape(suite.name), $counts[0], $counts[1], $counts[2], $counts[3], timeStr])
+
+  for test in suite.tests.items():
+    s.writeTest(test)
+
+  s.writeLine("\t</testsuite>")
+
+method testRunEnded*(formatter: JUnitOutputFormatter) =
+  ## Completes the report and closes the underlying stream.
+  let s = formatter.stream
   try:
-    formatter.stream.writeLine("\t</testsuite>")
-  except CatchableError as exc:
+    s.writeLine("<testsuites>")
+
+    for suite in formatter.suites.mitems():
+      s.writeSuite(suite)
+
+    if formatter.defaultSuite.tests.len() > 0:
+      s.writeSuite(formatter.defaultSuite)
+
+    s.writeLine("</testsuites>")
+    s.close()
+  except Exception as exc: # Work around Exception raised in stream
     echo "Cannot write JUnit: ", exc.msg
     quit 1
 
@@ -526,19 +575,44 @@ proc shouldRun(currentSuiteName, testName: string): bool =
 
   return false
 
-proc ensureInitialized() =
-  withLock formattersLock:
-    {.gcsafe.}:
-      if formatters.len == 0:
-        formatters = @[OutputFormatter(defaultConsoleFormatter())]
+proc cleanupFormatters() {.noconv.} =
+  withLock(formattersLock):
+    for f in formatters.mitems():
+      testRunEnded(f)
 
+proc parseParameters*(args: openArray[string]) =
   withLock testFiltersLock:
-    {.gcsafe.}:
-      if not disabledParamFiltering:
-        when declared(paramCount):
-          # Read tests to run from the command line.
-          for i in 1 .. paramCount():
-            testsFilters.incl(paramStr(i))
+    withLock formattersLock:
+      # Read tests to run from the command line.
+      for str in args:
+        if str.startsWith("--help"):
+          echo "Usage: [--xml=file.xml] [--console] [test-name-glob]"
+          quit 0
+        elif str.startsWith("--xml"):
+          let fn = str[("--xml".len + 1)..^1] # skip separator char as well
+          try:
+            formatters.add(newJUnitOutputFormatter(
+              newFileStream(fn, fmWrite)))
+          except CatchableError as exc:
+            echo "Cannot open ", fn, " for writing: ", exc.msg
+            quit 1
+        elif str.startsWith("--console"):
+          formatters.add(defaultConsoleFormatter())
+        else:
+          testsFilters.incl(str)
+
+proc ensureInitialized() =
+  if autoParseArgs and declared(paramCount):
+    parseParameters(commandLineParams())
+
+  withLock formattersLock:
+    if formatters.len == 0:
+      formatters = @[OutputFormatter(defaultConsoleFormatter())]
+
+  # Best-effort attempt to close formatters after the last test has run
+  addQuitProc(cleanupFormatters)
+
+ensureInitialized() # Run once!
 
 proc suiteStarted(name: string) =
   when paralleliseTests:
@@ -603,7 +677,7 @@ template suite*(name, body) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind formatters, ensureInitialized, suiteStarted, suiteEnded
+  bind formatters, suiteStarted, suiteEnded
 
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
@@ -620,7 +694,6 @@ template suite*(name, body) {.dirty.} =
 
     let testSuiteName {.used.} = name
 
-    ensureInitialized()
     try:
       suiteStarted(name)
       body
@@ -633,7 +706,7 @@ template suite*(name, body) {.dirty.} =
 
 template exceptionTypeName(e: typed): string = $e.name
 
-template test*(name, body) =
+template test*(name: string, body: untyped) =
   ## Define a single test case identified by `name`.
   ##
   ## .. code-block:: nim
@@ -647,10 +720,7 @@ template test*(name, body) =
   ## .. code-block::
   ##
   ##  [OK] roses are red
-  bind shouldRun, checkpoints, ensureInitialized, testEnded, exceptionTypeName
-  withLock formattersLock:
-    {.gcsafe.}:
-      bind formatters
+  bind shouldRun, checkpoints, testStarted, testEnded, exceptionTypeName
 
   # `gensym` can't be in here because it's not a first-class pragma
   when paralleliseTests:
@@ -662,19 +732,19 @@ template test*(name, body) =
     {.pragma: testrunner.}
 
   proc runTest(testSuiteName: string, testName: string): int {.gensym, testrunner.} =
-    ensureInitialized()
-
     checkpoints = @[]
     var testStatusIMPL {.inject.} = TestStatus.OK
     let testName {.inject.} = testName
 
     testStarted(testName)
+    let startTime = getMonoTime()
+
     try:
       when declared(testSetupIMPLFlag): testSetupIMPL()
       when declared(testTeardownIMPLFlag):
         defer: testTeardownIMPL()
-
-      body
+      block:
+        body
 
     except Exception as e: # This will also catch Defect which may or may not work
       let eTypeDesc = "[" & exceptionTypeName(e) & "]"
@@ -690,18 +760,20 @@ template test*(name, body) =
         programResult = 1
       let testResult = TestResult(
         suiteName: testSuiteName,
-        testName: name,
-        status: testStatusIMPL
+        testName: testName,
+        status: testStatusIMPL,
+        duration: getMonoTime() - startTime
       )
       testEnded(testResult)
       checkpoints = @[]
 
   let optionalTestSuiteName = when declared(testSuiteName): testSuiteName else: ""
-  if shouldRun(optionalTestSuiteName, name):
+  let tname = name
+  if shouldRun(optionalTestSuiteName, tname):
     when paralleliseTests:
-      flowVars.add(spawn runTest(optionalTestSuiteName, name))
+      flowVars.add(spawn runTest(optionalTestSuiteName, tname))
     else:
-      discard runTest(optionalTestSuiteName, name)
+      discard runTest(optionalTestSuiteName, tname)
 
 proc checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
@@ -730,13 +802,10 @@ template fail* =
   ##  fail()
   ##
   ## outputs "Checkpoint A" before quitting.
-  bind ensureInitialized
   when declared(testStatusIMPL):
     testStatusIMPL = TestStatus.FAILED
   else:
     programResult = 1
-
-  ensureInitialized()
 
   withLock formattersLock:
     {.gcsafe.}:
@@ -904,6 +973,6 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
 
   result = getAst(expectBody(errorTypes, errorTypes.lineInfo, body))
 
-proc disableParamFiltering* =
-  ## disables filtering tests with the command line params
-  disabledParamFiltering = true
+proc disableParamFiltering* {.deprecated:
+    "Compile with -d:nimtestDisableParamFiltering instead".} =
+  discard
