@@ -1,4 +1,4 @@
-name: nim-unittest2 CI
+name: CI
 on: [push, pull_request]
 
 jobs:
@@ -136,13 +136,13 @@ jobs:
       - name: Build the Nim compiler
         shell: bash
         run: |
-          git clone -b ${{ matrix.branch }} --depth 1 git://github.com/nim-lang/nim nim/
           curl -O -L -s -S https://raw.githubusercontent.com/status-im/nimbus-build-system/master/scripts/build_nim.sh
-          env MAKE="${MAKE_CMD} -j${ncpu}" ARCH_OVERRIDE=${PLATFORM} CC=gcc QUICK_AND_DIRTY_COMPILER=1 bash build_nim.sh nim csources dist/nimble NimBinaries
+          env MAKE="${MAKE_CMD} -j${ncpu}" ARCH_OVERRIDE=${PLATFORM} CC=gcc QUICK_AND_DIRTY_COMPILER=1 NIM_COMMIT=${{ matrix.branch }} bash build_nim.sh nim csources dist/nimble NimBinaries
           echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
 
       - name: Run tests
         shell: bash
         run: |
+          nim --version
           nim --hints:off --verbosity:0 test
 
