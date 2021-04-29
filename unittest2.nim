@@ -8,7 +8,7 @@
 
 {.push raises: [Defect].}
 
-## :Authors: Zahary Karadjov, Stefan Talpalaru
+## :Authors: Zahary Karadjov, Ștefan Talpalaru
 ##
 ## This module implements boilerplate to make unit testing easy.
 ##
@@ -61,6 +61,16 @@
 ##   nim c -r test "auth*::" "crypto::hashing*"
 ##   # Run suites starting with 'bug #' and standalone tests starting with '#'
 ##   nim c -r test 'bug #*::' '::#*'
+##
+## Command line arguments
+## ======================
+##
+## --help      Print short help and quit
+## --xml:file  Write JUnit-compatible XML report to `file`
+## --console   Write report to the console (default, when no other output is
+##             selected)
+##
+## Command line parsing can be disabled with `-d:unittest2DisableParamFiltering`.
 ##
 ## Running tests in parallel
 ## =========================
@@ -118,16 +128,6 @@
 ##
 ##     suiteTeardown:
 ##       echo "suite teardown: run once after the tests"
-##
-## Command line arguments
-## ======================
-##
-## --help      Print short help and quit
-## --xml:file  Write JUnit-compatible XML report to `file`
-## --console   Write report to the console (default, when no other output is
-##             selected)
-##
-## Command line parsing can be disabled with `-d:nimtestDisableParamFiltering`.
 
 import std/[locks, macros, sets, strutils, streams, times, monotimes]
 
@@ -136,10 +136,10 @@ when declared(stdout):
 
 const useTerminal = not defined(js)
 
-# compile with `-d:nimtestDisableParamFiltering` to skip parsing test filters,
+# compile with `-d:unittest2DisableParamFiltering` to skip parsing test filters,
 # `--help` and other command line options - you can manually call
 # `parseParameters` instead then.
-const autoParseArgs = not defined(nimtestDisableParamFiltering)
+const autoParseArgs = not defined(unittest2DisableParamFiltering)
 
 when useTerminal:
   import std/terminal
@@ -252,7 +252,6 @@ var
   formatters {.guard: formattersLock.}: seq[OutputFormatter]
   testFiltersLock: Lock
   testsFilters {.guard: testFiltersLock.}: HashSet[string]
-  disabledParamFiltering: bool
 
 const
   outputLevelDefault = PRINT_ALL
@@ -953,6 +952,9 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
       of 3: raise newException(IOError, "I can't do that Dave.")
       else: assert 2 + 2 == 5
 
+    when (NimMajor, NimMinor, NimPatch) < (1, 4, 0):
+      type AssertionDefect = AssertionError
+
     expect IOError, OSError, ValueError, AssertionDefect:
       defectiveRobot()
 
@@ -974,5 +976,5 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
   result = getAst(expectBody(errorTypes, errorTypes.lineInfo, body))
 
 proc disableParamFiltering* {.deprecated:
-    "Compile with -d:nimtestDisableParamFiltering instead".} =
+    "Compile with -d:unittest2DisableParamFiltering instead".} =
   discard

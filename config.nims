@@ -1,8 +1,24 @@
 task test, "Run tests":
+  let
+    xmlFile = "test_results.xml"
+    commandStart = "nim c -r -f --threads:on --hints:off --verbosity:0 --skipParentCfg:on --skipUserCfg:on "
+
   for f in listFiles("tests"):
     if f.len > 4 and f[^4..^1] == ".nim":
-      let cmd = "nim c -r -f --threads:on --hints:off --verbosity:0 --skipParentCfg:on --skipUserCfg:on " & f
+      # This should generate an XML results file.
+      var cmd = commandStart & f & " --xml:" & xmlFile & " --console"
       echo cmd
       exec cmd
-      rmFile(f[0..^5].toExe())
+      doAssert fileExists xmlFile
+      rmFile xmlFile
+
+      # This should not, since we disable param processing.
+      cmd = commandStart & "-d:unittest2DisableParamFiltering " & f & " --xml:" & xmlFile
+      echo cmd
+      exec cmd
+      doAssert not fileExists xmlFile
+      rmFile f[0..^5].toExe
+
+task buildDocs, "Build docs":
+  exec "nim doc --skipParentCfg:on --skipUserCfg:on --git.url:https://github.com/status-im/nim-unittest2 --git.commit:master --git.devel:master unittest2.nim"
 
