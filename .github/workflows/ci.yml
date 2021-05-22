@@ -42,40 +42,6 @@ jobs:
       - name: Git checkout
         uses: actions/checkout@v2
 
-      - name: Derive environment variables
-        run: |
-          if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
-            ARCH=64
-            PLATFORM=x64
-          else
-            ARCH=32
-            PLATFORM=x86
-          fi
-          echo "ARCH=$ARCH" >> $GITHUB_ENV
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-
-          if [[ '${{ matrix.target.os }}' == 'windows' ]]; then
-            MAKE_CMD="mingw32-make"
-          else
-            MAKE_CMD="make"
-          fi
-          echo "MAKE_CMD=$MAKE_CMD" >> $GITHUB_ENV
-
-          ncpu=
-          case '${{ runner.os }}' in
-          'Linux')
-            ncpu=$(nproc)
-            ;;
-          'macOS')
-            ncpu=$(sysctl -n hw.ncpu)
-            ;;
-          'Windows')
-            ncpu=$NUMBER_OF_PROCESSORS
-            ;;
-          esac
-          [[ -z "$ncpu" || $ncpu -le 0 ]] && ncpu=1
-          echo "ncpu=$ncpu" >> $GITHUB_ENV
-
       - name: Install build dependencies (Linux i386)
         if: runner.os == 'Linux' && matrix.target.cpu == 'i386'
         run: |
@@ -137,8 +103,41 @@ jobs:
         if: >
           runner.os == 'Windows'
         run: |
-          echo "${{ github.workspace }}/external/mingw-${{ matrix.target.cpu }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/external/dlls-${{ matrix.target.cpu }}" >> $GITHUB_PATH
+
+      - name: Derive environment variables
+        run: |
+          if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
+            ARCH=64
+            PLATFORM=x64
+          else
+            ARCH=32
+            PLATFORM=x86
+          fi
+          echo "ARCH=$ARCH" >> $GITHUB_ENV
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+
+          if [[ '${{ matrix.target.os }}' == 'windows' ]]; then
+            MAKE_CMD="mingw32-make"
+          else
+            MAKE_CMD="make"
+          fi
+          echo "MAKE_CMD=$MAKE_CMD" >> $GITHUB_ENV
+
+          ncpu=
+          case '${{ runner.os }}' in
+          'Linux')
+            ncpu=$(nproc)
+            ;;
+          'macOS')
+            ncpu=$(sysctl -n hw.ncpu)
+            ;;
+          'Windows')
+            ncpu=$NUMBER_OF_PROCESSORS
+            ;;
+          esac
+          [[ -z "$ncpu" || $ncpu -le 0 ]] && ncpu=1
+          echo "ncpu=$ncpu" >> $GITHUB_ENV
 
       - name: Build the Nim compiler
         run: |
