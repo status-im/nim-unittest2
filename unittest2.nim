@@ -676,7 +676,7 @@ template suite*(name, body) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind formatters, suiteStarted, suiteEnded
+  bind suiteStarted, suiteEnded
 
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
