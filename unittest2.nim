@@ -965,8 +965,9 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
       fail()
     except errorTypes:
       discard
-    except:
-      checkpoint(lineInfoLit & ": Expect Failed, unexpected exception was thrown.")
+    except Exception as e:
+      checkpoint(lineInfoLit & ": Expect Failed, unexpected " & $e.name &
+      " (" & e.msg & ") was thrown.\n" & e.getStackTrace())
       fail()
 
   var errorTypes = newNimNode(nnkBracket)
