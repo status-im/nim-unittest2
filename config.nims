@@ -20,5 +20,5 @@ task test, "Run tests":
       rmFile f[0..^5].toExe
 
 task buildDocs, "Build docs":
-  exec "nim doc --skipParentCfg:on --skipUserCfg:on --git.url:https://github.com/status-im/nim-unittest2 --git.commit:master --git.devel:master unittest2.nim"
+  exec "nim doc --skipParentCfg:on --skipUserCfg:on --outdir:docs --git.url:https://github.com/status-im/nim-unittest2 --git.commit:master --git.devel:master unittest2.nim"
 
