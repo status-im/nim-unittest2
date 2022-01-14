@@ -1,7 +1,7 @@
 task test, "Run tests":
   let
     xmlFile = "test_results.xml"
-    commandStart = "nim c -r -f --threads:on --hints:off --verbosity:0 --skipParentCfg:on --skipUserCfg:on "
+    commandStart = "nim " & getEnv("TEST_LANG", "c") & " -r -f --threads:on --hints:off --verbosity:0 --skipParentCfg:on --skipUserCfg:on " & getEnv("NIMFLAGS") & " "
 
   for f in listFiles("tests"):
     if f.len > 4 and f[^4..^1] == ".nim":

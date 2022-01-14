@@ -1,12 +1,16 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
     timeout-minutes: 15
     strategy:
       fail-fast: false
-      max-parallel: 20
       matrix:
         target:
           - os: linux
@@ -17,7 +21,9 @@ jobs:
             cpu: amd64
           - os: windows
             cpu: amd64
-        branch: [version-1-2, version-1-4, devel]
+          #- os: windows
+            #cpu: i386
+        branch: [version-1-2, version-1-4, version-1-6, devel]
         include:
           - target:
               os: linux
@@ -87,23 +93,23 @@ jobs:
         id: windows-dlls-cache
         uses: actions/cache@v2
         with:
-          path: external/dlls-${{ matrix.target.cpu }}
-          key: 'dlls-${{ matrix.target.cpu }}'
+          path: external/dlls
+          key: 'dlls'
 
       - name: Install DLLs dependencies (Windows)
         if: >
           steps.windows-dlls-cache.outputs.cache-hit != 'true' &&
           runner.os == 'Windows'
         run: |
-          mkdir -p external
+          mkdir external
           curl -L "https://nim-lang.org/download/windeps.zip" -o external/windeps.zip
-          7z x -y external/windeps.zip -oexternal/dlls-${{ matrix.target.cpu }}
+          7z x -y external/windeps.zip -oexternal/dlls
 
       - name: Path to cached dependencies (Windows)
         if: >
           runner.os == 'Windows'
         run: |
-          echo "${{ github.workspace }}/external/dlls-${{ matrix.target.cpu }}" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/external/dlls" >> $GITHUB_PATH
 
       - name: Derive environment variables
         run: |
@@ -142,11 +148,18 @@ jobs:
       - name: Build the Nim compiler
         run: |
           curl -O -L -s -S https://raw.githubusercontent.com/status-im/nimbus-build-system/master/scripts/build_nim.sh
-          env MAKE="${MAKE_CMD} -j${ncpu}" ARCH_OVERRIDE=${PLATFORM} CC=gcc QUICK_AND_DIRTY_COMPILER=1 NIM_COMMIT=${{ matrix.branch }} bash build_nim.sh nim csources dist/nimble NimBinaries
+          env MAKE="${MAKE_CMD} -j${ncpu}" ARCH_OVERRIDE=${PLATFORM} NIM_COMMIT=${{ matrix.branch }} \
+            QUICK_AND_DIRTY_COMPILER=1 CC=gcc \
+            bash build_nim.sh nim csources dist/nimble NimBinaries
           echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
 
       - name: Run tests
         run: |
+          if [[ "${{ matrix.target.os }}" == "windows" ]]; then
+            # https://github.com/status-im/nimbus-eth2/issues/3121
+            export NIMFLAGS="-d:nimRawSetjmp"
+          fi
           nim --version
-          nim --hints:off --verbosity:0 test
+          env TEST_LANG="c" nim --hints:off --verbosity:0 test
+          env TEST_LANG="cpp" nim --hints:off --verbosity:0 test
 
