@@ -1,0 +1,48 @@
+name: Docgen
+on:
+  push:
+    branches:
+      - master
+      - cidocs
+  workflow_dispatch:
+
+jobs:
+  build:
+    timeout-minutes: 10
+
+    name: 'Generate & upload documentation'
+    runs-on: 'ubuntu-20.04'
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: 'stable'
+
+      - name: Generate doc
+        run: |
+          nim --version
+          nim buildDocs || true
+
+      - name: Clone the gh-pages branch
+        uses: actions/checkout@v2
+        with:
+          ref: gh-pages
+          path: subdoc
+          submodules: true
+          fetch-depth: 0
+
+      - name: Commit & push
+        run: |
+          rm -f subdoc/*
+          mv docs/* subdoc
+          cd subdoc
+          git add .
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+          git config --global user.name = "${{ github.actor }}"
+          git commit -a -m "update docs"
+          git push origin gh-pages
