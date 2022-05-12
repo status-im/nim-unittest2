@@ -38,7 +38,7 @@ jobs:
 
       - name: Commit & push
         run: |
-          rm subdoc/*
+          rm -f subdoc/*
           mv docs/* subdoc
           cd subdoc
           git add .
