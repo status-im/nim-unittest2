@@ -372,7 +372,8 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
     let
       prefix = if testResult.suiteName.len > 0: "  " else: ""
       testHeader =
-        when defined(unittestPrintTime):
+        if defined(unittestPrintTime) or
+          getEnv("NIMTEST_TIMING").toLowerAscii().startsWith("t"):
           let
             seconds = testResult.duration.inMilliseconds.float / 1000.0
             precision = max(3 - ($seconds.int).len, 1)
