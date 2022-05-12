@@ -364,6 +364,10 @@ method failureOccurred*(formatter: ConsoleOutputFormatter,
   for msg in items(checkpoints):
     echo prefix, msg
 
+let consoleShowTiming =
+  defined(unittestPrintTime) or
+  getEnv("NIMTEST_TIMING").toLowerAscii().startsWith("t")
+
 method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   formatter.isInTest = false
 
@@ -372,8 +376,7 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
     let
       prefix = if testResult.suiteName.len > 0: "  " else: ""
       testHeader =
-        if defined(unittestPrintTime) or
-          getEnv("NIMTEST_TIMING").toLowerAscii().startsWith("t"):
+        if consoleShowTiming:
           let
             seconds = testResult.duration.inMilliseconds.float / 1000.0
             precision = max(3 - ($seconds.int).len, 1)
