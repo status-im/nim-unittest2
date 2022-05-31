@@ -364,14 +364,27 @@ method failureOccurred*(formatter: ConsoleOutputFormatter,
   for msg in items(checkpoints):
     echo prefix, msg
 
+let consoleShowTiming =
+  defined(unittestPrintTime) or
+  getEnv("NIMTEST_TIMING").toLowerAscii().startsWith("t")
+
 method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   formatter.isInTest = false
 
   if formatter.outputLevel != OutputLevel.PRINT_NONE and
       (formatter.outputLevel == OutputLevel.PRINT_ALL or testResult.status == TestStatus.FAILED):
-    let prefix = if testResult.suiteName.len > 0: "  " else: ""
-    template rawPrint() = echo(prefix, "[", $testResult.status, "] ",
-        testResult.testName)
+    let
+      prefix = if testResult.suiteName.len > 0: "  " else: ""
+      testHeader =
+        if consoleShowTiming:
+          let
+            seconds = testResult.duration.inMilliseconds.float / 1000.0
+            precision = max(3 - ($seconds.int).len, 1)
+            formattedSeconds = formatFloat(seconds, ffDecimal, precision)
+          prefix & "[" & $testResult.status & " - " & formattedSeconds & "s] "
+        else:
+          prefix & "[" & $testResult.status & "] "
+    template rawPrint() = echo(testHeader, testResult.testName)
     when useTerminal:
       if formatter.colorOutput:
         var color = case testResult.status
@@ -379,7 +392,7 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
           of TestStatus.FAILED: fgRed
           of TestStatus.SKIPPED: fgYellow
         try:
-          styledEcho styleBright, color, prefix, "[", $testResult.status, "] ",
+          styledEcho styleBright, color, testHeader,
               resetStyle, testResult.testName
         except Exception: rawPrint() # Work around exceptions in `terminal.nim`
       else:
