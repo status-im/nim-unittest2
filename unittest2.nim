@@ -277,7 +277,7 @@ method suiteStarted*(formatter: OutputFormatter, suiteName: string) {.base, gcsa
 method testStarted*(formatter: OutputFormatter, testName: string) {.base, gcsafe.} =
   discard
 method failureOccurred*(formatter: OutputFormatter, checkpoints: seq[string],
-    stackTrace: string) {.base, gcsafe.} =
+    stackTrace: string) {.base, gcsafe, raises: [Defect].} =
   ## ``stackTrace`` is provided only if the failure occurred due to an exception.
   ## ``checkpoints`` is never ``nil``.
   discard
