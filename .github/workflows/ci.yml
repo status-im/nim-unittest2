@@ -155,10 +155,6 @@ jobs:
 
       - name: Run tests
         run: |
-          if [[ "${{ matrix.target.os }}" == "windows" ]]; then
-            # https://github.com/status-im/nimbus-eth2/issues/3121
-            export NIMFLAGS="-d:nimRawSetjmp"
-          fi
           nim --version
           env TEST_LANG="c" nim --hints:off --verbosity:0 test
           env TEST_LANG="cpp" nim --hints:off --verbosity:0 test
