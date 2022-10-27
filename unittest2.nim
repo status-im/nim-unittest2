@@ -237,7 +237,7 @@ type
   JUnitTest = object
     name: string
     result: TestResult
-    error: (seq[string], string)
+    error: tuple[checkpoints: seq[string], stackTraces: seq[string]]
     failures: seq[seq[string]]
 
   JUnitSuite = object
@@ -287,7 +287,7 @@ method suiteStarted*(formatter: OutputFormatter, suiteName: string) {.base, gcsa
 method testStarted*(formatter: OutputFormatter, testName: string) {.base, gcsafe.} =
   discard
 method failureOccurred*(formatter: OutputFormatter, checkpoints: seq[string],
-    stackTrace: string) {.base, gcsafe.} =
+    stackTraces: seq[string]) {.base, gcsafe.} =
   ## ``stackTrace`` is provided only if the failure occurred due to an exception.
   ## ``checkpoints`` is never ``nil``.
   discard
@@ -489,13 +489,14 @@ method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
 
 method failureOccurred*(formatter: ConsoleOutputFormatter,
                         checkpoints: seq[string], stackTrace: string) =
-  if stackTrace.len > 0:
-    formatter.errors.add(stackTrace)
-    formatter.errors.add("\n")
+
   for msg in items(checkpoints):
     formatter.errors.add("    ")
     formatter.errors.add(msg)
     formatter.errors.add("\n")
+    if stackTraces.len > i:
+      formatter.errors.add(stackTraces[i])
+      formatter.errors.add("\n")
 
 proc color(status: TestStatus): ForegroundColor =
   case status
@@ -712,11 +713,11 @@ method testStarted*(formatter: JUnitOutputFormatter, testName: string) =
   formatter.suite().tests.add(JUnitTest(name: testName))
 
 method failureOccurred*(formatter: JUnitOutputFormatter,
-                        checkpoints: seq[string], stackTrace: string) =
+                        checkpoints: seq[string], stackTraces: seq[string]) =
   ## ``stackTrace`` is provided only if the failure occurred due to an exception.
   ## ``checkpoints`` is never ``nil``.
-  if stackTrace.len > 0:
-    formatter.suite().tests[^1].error = (checkpoints, stackTrace)
+  if stackTraces.len > 0:
+    formatter.suite().tests[^1].error = (checkpoints, stackTraces)
   else:
     formatter.suite().tests[^1].failures.add(checkpoints)
 
@@ -742,9 +743,9 @@ proc writeTest(s: Stream, test: JUnitTest) {.raises: [CatchableError].} =
   of TestStatus.SKIPPED:
     s.writeLine("\t\t\t<skipped />")
   of TestStatus.FAILED:
-    if test.error[0].len > 0:
+    if test.error.checkpoints.len > 0:
       s.writeLine("\t\t\t<error message=\"$#\">$#</error>" % [
-          xmlEscape(join(test.error[0], "\n")), xmlEscape(test.error[1])])
+          xmlEscape(join(test.error.checkpoints, "\n")), xmlEscape(join(test.error.stacktraces))])
 
     for failure in test.failures:
       s.writeLine("\t\t\t<failure message=\"$#\">$#</failure>" %
@@ -762,7 +763,7 @@ proc countTests(counts: var (int, int, int, int, float), suite: JUnitSuite) =
     of TestStatus.SKIPPED:
       counts[3] += 1
     of TestStatus.FAILED:
-      if test.error[0].len > 0:
+      if test.error.checkpoints.len > 0:
         counts[2] += 1
       else:
         counts[1] += 1
@@ -1000,11 +1001,11 @@ template fail* =
 
   for formatter in formatters:
     let formatter = formatter # avoid lent iterator
-    when declared(stackTrace):
+    when declared(stackTraces):
       when stackTrace is string:
-        formatter.failureOccurred(checkpoints, stackTrace)
+        formatter.failureOccurred(checkpoints, stackTraces)
       else:
-        formatter.failureOccurred(checkpoints, "")
+        formatter.failureOccurred(checkpoints, newSeq[string]())
     else:
       formatter.failureOccurred(checkpoints, "")
 
@@ -1081,15 +1082,38 @@ template test*(nameParam: string, body: untyped) =
 
     try:
       when declared(testSetupIMPLFlag): testSetupIMPL()
-      when declared(testTeardownIMPLFlag):
-        defer: testTeardownIMPL()
       block:
-        body
+        when (NimMajor, NimMinor) >= (1, 6):
+          {.warning[BareExcept]:off.}
+
+        try:
+          body
+        except Exception as eBody:
+          try:
+            when declared(testTeardownIMPLFlag):
+              testTeardownIMPL()
+          except Exception as eTeardown:
+            eTeardown.parent = eBody
+            raise eTeardown
+          raise eBody
+        when declared(testTeardownIMPLFlag):
+          testTeardownIMPL()
+
+        when (NimMajor, NimMinor) >= (1, 6):
+          {.warning[BareExcept]:on.}
 
     except CatchableError as e:
       let eTypeDesc = "[" & $e.name & "]"
       checkpoint("Unhandled error: " & e.msg & " " & eTypeDesc)
-      var stackTrace {.inject.} = e.getStackTrace()
+      let eTypeDesc = "[" & exceptionTypeName(e) & "]"
+        checkpoint("Unhandled exception: " & e.msg & " " & eTypeDesc)
+        var stackTraces {.inject.} = newSeq[string]()
+        stackTraces.add(e.getStackTrace())
+
+        if e.parent != nil:
+          let eParentTypeDesc = "[" & exceptionTypeName(e.parent) & "]"
+          stackTraces.add(e.parent.getStackTrace())
+          checkpoint("Unhandled exception: " & e.parent.msg & " " & eParentTypeDesc)
       fail()
 
     except Defect as e: # This may or may not work dependings on --panics
@@ -1100,7 +1124,7 @@ template test*(nameParam: string, body: untyped) =
     except Exception as e:
       let eTypeDesc = "[" & $e.name & "]"
       checkpoint("Unhandled exception that may cause undefined behavior: " & e.msg & " " & eTypeDesc)
-      var stackTrace {.inject.} = e.getStackTrace()
+      var stackTrace {.inject, used.} = e.getStackTrace()
       fail()
 
     checkpoints = @[]
