@@ -760,7 +760,7 @@ template fail* =
 
   if abortOnError: quit(1)
 
-  checkpoints = @[]
+  checkpoints = newSeq[string]()
 
 template skip* =
   ## Mark the test as skipped. Should be used directly
