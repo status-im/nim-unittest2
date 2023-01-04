@@ -130,6 +130,8 @@
 ##       echo "suite teardown: run once after the tests"
 
 import std/[locks, macros, sets, strutils, streams, times, monotimes]
+when (NimMajor, NimMinor) > (1, 2):
+  from std/exitprocs import nil
 
 when declared(stdout):
   import std/os
@@ -150,6 +152,20 @@ when declared(stdout):
     ## This constant might be useful in custom output formatters.
 else:
   const paralleliseTests* = false
+
+when (NimMajor, NimMinor) > (1, 2):
+  template addExitProc(p: proc) =
+    when (NimMajor, NimMinor) > (1, 6):
+      exitprocs.addExitProc(p)
+    else:
+      try:
+        exitprocs.addExitProc(p)
+      except Exception as e:
+        echo "Can't add exit proc", e.msg
+        quit(1)
+else:
+  template addExitProc(p: proc) =
+    addQuitProc(p)
 
 when paralleliseTests:
   import threadpool
@@ -177,7 +193,7 @@ when paralleliseTests:
     # "require" can exit from a worker thread and syncing in there would block
     if getThreadId() == mainThreadID:
       sync()
-  addQuitProc(quitProc)
+  addExitProc(quitProc)
 
   var outputLock: Lock # used by testEnded() to avoid mixed test outputs
   initLock(outputLock)
@@ -348,7 +364,7 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
     if formatter.colorOutput:
       try:
         styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
-      except Exception: rawPrint() # Work around exceptions in `terminal.nim`
+      except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
     else: rawPrint()
   else: rawPrint()
   formatter.isInSuite = true
@@ -394,7 +410,7 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
         try:
           styledEcho styleBright, color, testHeader,
               resetStyle, testResult.testName
-        except Exception: rawPrint() # Work around exceptions in `terminal.nim`
+        except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
       else:
         rawPrint()
     else:
@@ -521,6 +537,9 @@ proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [Exception].} =
 method testRunEnded*(formatter: JUnitOutputFormatter) =
   ## Completes the report and closes the underlying stream.
   let s = formatter.stream
+
+  when (NimMajor, NimMinor) > (1, 6):
+    {.warning[BareExcept]:off.}
   try:
     s.writeLine("<testsuites>")
 
@@ -535,6 +554,9 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
   except Exception as exc: # Work around Exception raised in stream
     echo "Cannot write JUnit: ", exc.msg
     quit 1
+
+  when (NimMajor, NimMinor) > (1, 6):
+    {.warning[BareExcept]:on.}
 
 proc glob(matcher, filter: string): bool =
   ## Globbing using a single `*`. Empty `filter` matches everything.
@@ -622,7 +644,7 @@ proc ensureInitialized() =
       formatters = @[OutputFormatter(defaultConsoleFormatter())]
 
   # Best-effort attempt to close formatters after the last test has run
-  addQuitProc(cleanupFormatters)
+  addExitProc(cleanupFormatters)
 
 ensureInitialized() # Run once!
 
@@ -818,9 +840,18 @@ template test*(name: string, body: untyped) =
       block:
         body
 
-    except Exception as e: # This will also catch Defect which may or may not work
+    except CatchableError as e:
       let eTypeDesc = "[" & exceptionTypeName(e) & "]"
       checkpoint("Unhandled exception: " & e.msg & " " & eTypeDesc)
+      if e == nil: # foreign
+        fail()
+      else:
+        var stackTrace {.inject.} = e.getStackTrace()
+        fail()
+
+    except Defect as e: # This may or may not work dependings on --panics
+      let eTypeDesc = "[" & exceptionTypeName(e) & "]"
+      checkpoint("Unhandled defect: " & e.msg & " " & eTypeDesc)
       if e == nil: # foreign
         fail()
       else:
@@ -864,7 +895,9 @@ macro check*(conditions: untyped): untyped =
       "AKB48".toLowerAscii() == "akb48"
       'C' notin teams
 
+  {.warning[Deprecated]:off.}
   let checked = callsite()[1]
+  {.warning[Deprecated]:on.}
 
   template asgn(a: untyped, value: typed) =
     var a = value # XXX: we need "var: var" here in order to
@@ -978,7 +1011,11 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
       fail()
     except errorTypes:
       discard
-    except Exception as e:
+    except CatchableError as e:
+      checkpoint(lineInfoLit & ": Expect Failed, unexpected " & $e.name &
+      " (" & e.msg & ") was thrown.\n" & e.getStackTrace())
+      fail()
+    except Defect as e:
       checkpoint(lineInfoLit & ": Expect Failed, unexpected " & $e.name &
       " (" & e.msg & ") was thrown.\n" & e.getStackTrace())
       fail()
