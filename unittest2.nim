@@ -130,8 +130,6 @@
 ##       echo "suite teardown: run once after the tests"
 
 import std/[locks, macros, sets, strutils, streams, times, monotimes]
-when (NimMajor, NimMinor) > (1, 2):
-  from std/exitprocs import nil
 
 when declared(stdout):
   import std/os
@@ -154,6 +152,7 @@ else:
   const paralleliseTests* = false
 
 when (NimMajor, NimMinor) > (1, 2):
+  from std/exitprocs import nil
   template addExitProc(p: proc) =
     when (NimMajor, NimMinor) > (1, 6):
       exitprocs.addExitProc(p)
