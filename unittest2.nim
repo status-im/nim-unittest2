@@ -132,7 +132,7 @@
 import std/[locks, macros, sets, strutils, streams, times, monotimes]
 
 {.warning[LockLevel]:off.}
- 
+
 when declared(stdout):
   import std/os
 
@@ -366,9 +366,14 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
   template rawPrint() = echo("\n[Suite] ", suiteName)
   when useTerminal:
     if formatter.colorOutput:
-      try:
-        styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
-      except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
+      when (NimMajor, NimMinor) < (1, 4) and defined(windows):
+        try:
+          styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
+        except Exception: rawPrint() # Work around exceptions in `terminal.nim`
+      else:
+        try:
+          styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
+        except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
     else: rawPrint()
   else: rawPrint()
   formatter.isInSuite = true
@@ -411,10 +416,16 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
           of TestStatus.OK: fgGreen
           of TestStatus.FAILED: fgRed
           of TestStatus.SKIPPED: fgYellow
-        try:
-          styledEcho styleBright, color, testHeader,
-              resetStyle, testResult.testName
-        except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
+        when (NimMajor, NimMinor) < (1, 4) and defined(windows):
+          try:
+            styledEcho styleBright, color, testHeader,
+                resetStyle, testResult.testName
+          except Exception: rawPrint() # Work around exceptions in `terminal.nim`
+        else:
+          try:
+            styledEcho styleBright, color, testHeader,
+                resetStyle, testResult.testName
+          except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
       else:
         rawPrint()
     else:
