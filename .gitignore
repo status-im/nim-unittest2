@@ -1,3 +1,5 @@
 nimcache/
 docs/
 /nimble.develop
+*.exe
+test_results.xml

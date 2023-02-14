@@ -131,6 +131,8 @@
 
 import std/[locks, macros, sets, strutils, streams, times, monotimes]
 
+{.warning[LockLevel]:off.}
+ 
 when declared(stdout):
   import std/os
 
@@ -155,13 +157,16 @@ when (NimMajor, NimMinor) > (1, 2):
   from std/exitprocs import nil
   template addExitProc(p: proc) =
     when (NimMajor, NimMinor) >= (1, 6):
+      {.warning[BareExcept]:off.}
+
+    try:
       exitprocs.addExitProc(p)
-    else:
-      try:
-        exitprocs.addExitProc(p)
-      except Exception as e:
-        echo "Can't add exit proc", e.msg
-        quit(1)
+    except Exception as e:
+      echo "Can't add exit proc", e.msg
+      quit(1)
+
+    when (NimMajor, NimMinor) >= (1, 6):
+      {.warning[BareExcept]:on.}
 else:
   template addExitProc(p: proc) =
     addQuitProc(p)
