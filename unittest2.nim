@@ -1083,24 +1083,19 @@ template test*(nameParam: string, body: untyped) =
     try:
       when declared(testSetupIMPLFlag): testSetupIMPL()
       block:
-        when (NimMajor, NimMinor) >= (1, 6):
-          {.warning[BareExcept]:off.}
 
         try:
           body
-        except Exception as eBody:
+        except CatchableError as eBody:
           try:
             when declared(testTeardownIMPLFlag):
               testTeardownIMPL()
-          except Exception as eTeardown:
+          except CatchableError as eTeardown:
             eTeardown.parent = eBody
             raise eTeardown
           raise eBody
         when declared(testTeardownIMPLFlag):
           testTeardownIMPL()
-
-        when (NimMajor, NimMinor) >= (1, 6):
-          {.warning[BareExcept]:on.}
 
     except CatchableError as e:
       let eTypeDesc = "[" & $e.name & "]"
