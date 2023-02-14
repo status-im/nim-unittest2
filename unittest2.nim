@@ -6,7 +6,10 @@
 #        (c) Copyright 2021-Onwards Status Research and Development
 #
 
-{.push raises: [Defect].}
+when (NimMajor, NimMinor) < (1, 4):
+  {.push raises: [Defect].}
+else:
+  {.push raises: [].}
 
 ## :Authors: Zahary Karadjov, Ștefan Talpalaru
 ##
@@ -297,7 +300,7 @@ method suiteStarted*(formatter: OutputFormatter, suiteName: string) {.base, gcsa
 method testStarted*(formatter: OutputFormatter, testName: string) {.base, gcsafe.} =
   discard
 method failureOccurred*(formatter: OutputFormatter, checkpoints: seq[string],
-    stackTrace: string) {.base, gcsafe, raises: [Defect].} =
+    stackTrace: string) {.base, gcsafe.} =
   ## ``stackTrace`` is provided only if the failure occurred due to an exception.
   ## ``checkpoints`` is never ``nil``.
   discard

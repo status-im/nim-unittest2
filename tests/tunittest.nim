@@ -31,7 +31,7 @@ test "#964":
   check spuds == 24
 
 
-from strutils import toUpperAscii
+from strutils import toUpperAscii, parseInt
 test "#1384":
   check(@["hello", "world"].map(toUpperAscii) == @["HELLO", "WORLD"])
 
@@ -48,7 +48,6 @@ test "unittest multiple requires":
 
 
 import random
-from strutils import parseInt
 proc defectiveRobot() =
   randomize()
   case rand(1..4)
