@@ -1024,11 +1024,12 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
 
   template expectBody(errorTypes, lineInfoLit, body): NimNode {.dirty.} =
     try:
-      body
-      checkpoint(lineInfoLit & ": Expect Failed, no exception was thrown.")
-      fail()
-    except errorTypes:
-      discard
+      try:
+        body
+        checkpoint(lineInfoLit & ": Expect Failed, no exception was thrown.")
+        fail()
+      except errorTypes:
+        discard
     except CatchableError as e:
       checkpoint(lineInfoLit & ": Expect Failed, unexpected " & $e.name &
       " (" & e.msg & ") was thrown.\n" & e.getStackTrace())
