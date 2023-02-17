@@ -159,7 +159,7 @@ else:
 when (NimMajor, NimMinor) > (1, 2):
   from std/exitprocs import nil
   template addExitProc(p: proc) =
-    when (NimMajor, NimMinor) >= (1, 6):
+    when defined(nimHasWarnBareExcept):
       {.warning[BareExcept]:off.}
 
     try:
@@ -168,7 +168,7 @@ when (NimMajor, NimMinor) > (1, 2):
       echo "Can't add exit proc", e.msg
       quit(1)
 
-    when (NimMajor, NimMinor) >= (1, 6):
+    when defined(nimHasWarnBareExcept):
       {.warning[BareExcept]:on.}
 else:
   template addExitProc(p: proc) =
@@ -556,7 +556,7 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
   ## Completes the report and closes the underlying stream.
   let s = formatter.stream
 
-  when (NimMajor, NimMinor) >= (1, 6):
+  when defined(nimHasWarnBareExcept):
     {.warning[BareExcept]:off.}
   try:
     s.writeLine("<testsuites>")
@@ -573,7 +573,7 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
     echo "Cannot write JUnit: ", exc.msg
     quit 1
 
-  when (NimMajor, NimMinor) >= (1, 6):
+  when defined(nimHasWarnBareExcept):
     {.warning[BareExcept]:on.}
 
 proc glob(matcher, filter: string): bool =
