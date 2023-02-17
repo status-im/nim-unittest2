@@ -63,13 +63,13 @@ test "unittest expect":
     expect IOError, OSError, ValueError, AssertionError:
       defectiveRobot()
   expect CatchableError:
-    raise CatchableError.newException("Okay")
+    if true: raise CatchableError.newException("Okay")
   expect CatchableError, ValueError:
-    raise CatchableError.newException("Okay")
+    if true: raise CatchableError.newException("Okay")
   expect Defect:
-    raise Defect.newException("Okay")
+    if true: raise Defect.newException("Okay")
   expect Defect, CatchableError:
-    raise Defect.newException("Okay")
+    if true: raise Defect.newException("Okay")
 
 var
   a = 1
