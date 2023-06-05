@@ -794,7 +794,10 @@ template fail* =
     {.gcsafe.}:
       for formatter in formatters:
         when declared(stackTrace):
-          formatter.failureOccurred(checkpoints, stackTrace)
+          when stackTrace is string:
+            formatter.failureOccurred(checkpoints, stackTrace)
+          else:
+            formatter.failureOccurred(checkpoints, "")
         else:
           formatter.failureOccurred(checkpoints, "")
 
