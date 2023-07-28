@@ -6,10 +6,7 @@
 #        (c) Copyright 2021-Onwards Status Research and Development
 #
 
-when (NimMajor, NimMinor) < (1, 4):
-  {.push raises: [Defect].}
-else:
-  {.push raises: [].}
+{.push raises: [].}
 
 ## :Authors: Zahary Karadjov, Ștefan Talpalaru
 ##
@@ -156,23 +153,19 @@ when declared(stdout):
 else:
   const paralleliseTests* = false
 
-when (NimMajor, NimMinor) > (1, 2):
-  from std/exitprocs import nil
-  template addExitProc(p: proc) =
-    when defined(nimHasWarnBareExcept):
-      {.warning[BareExcept]:off.}
+from std/exitprocs import nil
+template addExitProc(p: proc) =
+  when defined(nimHasWarnBareExcept):
+    {.warning[BareExcept]:off.}
 
-    try:
-      exitprocs.addExitProc(p)
-    except Exception as e:
-      echo "Can't add exit proc", e.msg
-      quit(1)
+  try:
+    exitprocs.addExitProc(p)
+  except Exception as e:
+    echo "Can't add exit proc", e.msg
+    quit(1)
 
-    when defined(nimHasWarnBareExcept):
-      {.warning[BareExcept]:on.}
-else:
-  template addExitProc(p: proc) =
-    addQuitProc(p)
+  when defined(nimHasWarnBareExcept):
+    {.warning[BareExcept]:on.}
 
 when paralleliseTests:
   import threadpool
@@ -187,10 +180,7 @@ when paralleliseTests:
   proc repeatableSync*() =
     sync()
     for flowVar in flowVars:
-      when (NimMajor, NimMinor, NimPatch) >= (1, 4, 0):
-        blockUntil(flowVar[])
-      else:
-        blockUntil(flowVar)
+      blockUntil(flowVar[])
     flowVars = @[]
 
   # make sure all the spawned tests are done before exiting
@@ -369,14 +359,9 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
   template rawPrint() = echo("\n[Suite] ", suiteName)
   when useTerminal:
     if formatter.colorOutput:
-      when (NimMajor, NimMinor) < (1, 4) and defined(windows):
-        try:
-          styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
-        except Exception: rawPrint() # Work around exceptions in `terminal.nim`
-      else:
-        try:
-          styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
-        except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
+      try:
+        styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
+      except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
     else: rawPrint()
   else: rawPrint()
   formatter.isInSuite = true
@@ -419,16 +404,10 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
           of TestStatus.OK: fgGreen
           of TestStatus.FAILED: fgRed
           of TestStatus.SKIPPED: fgYellow
-        when (NimMajor, NimMinor) < (1, 4) and defined(windows):
-          try:
-            styledEcho styleBright, color, testHeader,
-                resetStyle, testResult.testName
-          except Exception: rawPrint() # Work around exceptions in `terminal.nim`
-        else:
-          try:
-            styledEcho styleBright, color, testHeader,
-                resetStyle, testResult.testName
-          except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
+        try:
+          styledEcho styleBright, color, testHeader,
+              resetStyle, testResult.testName
+        except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
       else:
         rawPrint()
     else:
@@ -1018,9 +997,6 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
       of 2: discard parseInt("Hello World!")
       of 3: raise newException(IOError, "I can't do that Dave.")
       else: assert 2 + 2 == 5
-
-    when (NimMajor, NimMinor, NimPatch) < (1, 4, 0):
-      type AssertionDefect = AssertionError
 
     expect IOError, OSError, ValueError, AssertionDefect:
       defectiveRobot()
