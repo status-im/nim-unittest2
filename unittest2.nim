@@ -793,6 +793,7 @@ template fail* =
   withLock formattersLock:
     {.gcsafe.}:
       for formatter in formatters:
+        let formatter = formatter # avoid lent iterator
         when declared(stackTrace):
           when stackTrace is string:
             formatter.failureOccurred(checkpoints, stackTrace)
@@ -968,17 +969,36 @@ macro check*(conditions: untyped): untyped =
 
   case checked.kind
   of nnkCallKinds:
-
     let (assigns, check, printOuts) = inspectArgs(checked)
     let lineinfo = newStrLitNode(checked.lineInfo)
     let callLit = checked.toStrLit
-    result = quote do:
-      block:
-        `assigns`
-        if not `check`:
-          checkpoint(`lineinfo` & ": Check failed: " & `callLit`)
-          `printOuts`
-          fail()
+    result = nnkBlockStmt.newTree(
+      newEmptyNode(),
+      nnkStmtList.newTree(
+        assigns,
+        nnkIfStmt.newTree(
+          nnkElifBranch.newTree(
+            nnkCall.newTree(ident("not"), check),
+            nnkStmtList.newTree(
+              nnkCall.newTree(
+                ident("checkpoint"),
+                nnkInfix.newTree(
+                  ident("&"),
+                  nnkInfix.newTree(
+                    ident("&"),
+                    lineinfo,
+                    newLit(": Check failed: ")
+                  ),
+                  callLit
+                )
+              ),
+              printOuts,
+              nnkCall.newTree(ident("fail"))
+            )
+          )
+        )
+      )
+    )
 
   of nnkStmtList:
     result = newNimNode(nnkStmtList)
@@ -990,10 +1010,31 @@ macro check*(conditions: untyped): untyped =
     let lineinfo = newStrLitNode(checked.lineInfo)
     let callLit = checked.toStrLit
 
-    result = quote do:
-      if not `checked`:
-        checkpoint(`lineinfo` & ": Check failed: " & `callLit`)
-        fail()
+    result = nnkBlockStmt.newTree(
+      newEmptyNode(),
+      nnkStmtList.newTree(
+        nnkIfStmt.newTree(
+          nnkElifBranch.newTree(
+            nnkCall.newTree(ident("not"), checked),
+            nnkStmtList.newTree(
+              nnkCall.newTree(
+                ident("checkpoint"),
+                nnkInfix.newTree(
+                  ident("&"),
+                  nnkInfix.newTree(
+                    ident("&"),
+                    lineinfo,
+                    newLit(": Check failed: ")
+                  ),
+                  callLit
+                )
+              ),
+              nnkCall.newTree(ident("fail"))
+            )
+          )
+        )
+      )
+    )
 
 template require*(conditions: untyped) =
   ## Same as `check` except any failed test causes the program to quit
