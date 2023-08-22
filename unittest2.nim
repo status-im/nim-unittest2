@@ -651,6 +651,7 @@ proc suiteStarted(name: string) =
   withLock formattersLock:
     {.gcsafe.}:
       for formatter in formatters:
+        let formatter = formatter # avoid lent iterator
         formatter.suiteStarted(name)
 
 proc suiteEnded() =
@@ -659,12 +660,14 @@ proc suiteEnded() =
   withLock formattersLock:
     {.gcsafe.}:
       for formatter in formatters:
+        let formatter = formatter # avoid lent iterator
         formatter.suiteEnded()
 
 proc testStarted(name: string) =
   withLock formattersLock:
     {.gcsafe.}:
       for formatter in formatters:
+        let formatter = formatter # avoid lent iterator
         if not formatter.isNil:
           # Useless check that somehow prevents a method dispatch failure on macOS
           formatter.testStarted(name)
@@ -673,6 +676,7 @@ proc testEnded(testResult: TestResult) =
   withLock formattersLock:
     {.gcsafe.}:
       for formatter in formatters:
+        let formatter = formatter # avoid lent iterator
         when paralleliseTests:
           withLock outputLock:
             formatter.testEnded(testResult)
