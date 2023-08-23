@@ -4,21 +4,23 @@
 
 Features of `unittest2` include:
 
-* [Parallel test execution](https://status-im.github.io/nim-unittest2/unittest2.html#running-tests-in-parallel)
+* Beautiful and compact user experience adapted for both humans and CI
 * Test separation with each test running in its own procedure
 * Strict exception handling with support for [exception tracking](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking)
+* JUnit-compatible XML test reports for tooling integration
+* Two-phase execution model as building block for advanced test scheduling and reporting features
 
-`unittest2` started as a [pull request](https://github.com/nim-lang/Nim/pull/9724) to evolve the [unittest](https://nim-lang.org/docs/unittest.html) module in Nim and has since grown into a separate library.
+`unittest2` is an evolution of the [unittest](https://nim-lang.org/docs/unittest.html) module in Nim - porting, while not trivial should at least be easy.
 
 ## Installing
 
-```text
+```sh
 nimble install unittest2
 ```
 
 or add a dependency in your `.nimble` file:
 
-```text
+```nim
 requires "unittest2"
 ```
 
@@ -37,16 +39,46 @@ suite "Suites can be used to group tests":
 ```
 
 Compile and run the unit tests:
-```bash
+
+```sh
 nim c -r test.nim
 ```
 
+The generated tests have a few command line options that can be viewed with `--help`:
+
+```sh
+nim c -r test.nim --help
+```
+
 See the [tests](./tests) for more examples!
+
+## Operation
+
+`unittest2` has two modes of operation: two-phase "collect-and-run" and single-pass "compatiblity".
+
+The single-pass mode is currently default and broadly similar to how `unittest` works: suites and tests are run in the order they are encountered in the test files.
+
+In "collect" mode a two-phase runner is used, first making a discovery pass to collect all tests then running them in a separate execution phase - this allows features such as test listing, progress indicators and in the future, smarter test scheduling strategies involving parallel and fully isolated execution.
+
+The two-phase "collect" mode runs into a few notable incompatibilites with respect to the traditional `unittest` model:
+
+* globals and code inside `suite` but not part of `setup`, `test` etc runs for all modules before tests are run
+  * this change in execution order may result in test failures and odd performance quirks
+* when re-running tests with filters, the globals end up being processed before filtering - this problem affects `unittest` also
+* running with process isolation may lead to surprises such as resource conflicts (sockets, databases, files ..) and poor performance as both the "collection" process and the execution process ends up running the same global section of the code
+
+Porting code to the two-phase mode includes:
+
+* moving code in `suite` into `setup`, `teardown` and similar locations
+* removing order-dependency from tests ensuring that each test can be run independently
+
+The two-phase mode will at some point become the default execution model for `unittest2` - it is enabled when the compatibility mode is turned off by passing `-d:unittest2Compat=false` to the compilation process.
 
 ## Porting code from `unittest`
 
 * Replace `import unittest` with `import unittest2`
 * `unittest2` places each test in a separate `proc` which changes the way templates inside tests are interpreted - some code changes may be necessary
+* prepare the code for two-phase operation by reducing reliance on globals and test execution order
 
 ## Testing `unittest2`
 
@@ -63,6 +95,8 @@ MIT
 
 - original author: Zahary Karadjov
 
-- fork author: Ștefan Talpalaru \<stefantalpalaru@yahoo.com\>
+- initial fork author: Ștefan Talpalaru \<stefantalpalaru@yahoo.com\>
+
+- current maintainer: Status R&D (https://status.im).
 
 - homepage: https://github.com/status-im/nim-unittest2
