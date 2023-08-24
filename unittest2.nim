@@ -515,10 +515,17 @@ proc formatDuration(dur: Duration, aligned = true): string =
 proc formatStatus(status: TestStatus): string =
   "[" & alignLeft($status, maxStatusLen) & "]"
 
+proc getAppFilename2(): string =
+  # TODO https://github.com/nim-lang/Nim/pull/22544
+  try:
+    getAppFilename()
+  except OSError:
+    ""
+
 proc printFailureInfo(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   # Show how to re-run this test case
   echo repeat('=', testResult.testName.len)
-  echo "  ", getAppFilename(), " ", quoteShell(testResult.suiteName & "::" & testResult.testName)
+  echo "  ", getAppFilename2(), " ", quoteShell(testResult.suiteName & "::" & testResult.testName)
   echo repeat('-', testResult.testName.len)
 
   # Show the output
@@ -1011,9 +1018,14 @@ proc runDirect(test: Test) =
   let startTime = getMonoTime()
   testStarted(test.testName)
 
-  let
-    status = test.impl(test.suiteName, test.testName)
-    duration = getMonoTime() - startTime
+  # TODO this annotation works around a limitation where we know that we only
+  #      call the callback from the main thread but the compiler doesn't -
+  #      when / if testing becomes multithreaded, this will need a proper
+  #      solution
+  {.gcsafe.}:
+    let
+      status = test.impl(test.suiteName, test.testName)
+      duration = getMonoTime() - startTime
 
   testEnded(TestResult(
     suiteName: test.suiteName,
@@ -1153,11 +1165,17 @@ macro check*(conditions: untyped): untyped =
             else:
               result.check[i][1] = arg
 
+  let
+    checkpointSym = bindSym("checkpoint")
+    checkSym = bindSym("check")
+    failSym = bindSym("fail")
+
   case checked.kind
   of nnkCallKinds:
     let (assigns, check, printOuts) = inspectArgs(checked)
     let lineinfo = newStrLitNode(checked.lineInfo)
     let callLit = checked.toStrLit
+    let checkpointSym = bindSym("checkpoint")
     result = nnkBlockStmt.newTree(
       newEmptyNode(),
       nnkStmtList.newTree(
@@ -1167,7 +1185,7 @@ macro check*(conditions: untyped): untyped =
             nnkCall.newTree(ident("not"), check),
             nnkStmtList.newTree(
               nnkCall.newTree(
-                ident("checkpoint"),
+                checkpointSym,
                 nnkInfix.newTree(
                   ident("&"),
                   nnkInfix.newTree(
@@ -1179,7 +1197,7 @@ macro check*(conditions: untyped): untyped =
                 )
               ),
               printOuts,
-              nnkCall.newTree(ident("fail"))
+              nnkCall.newTree(failSym)
             )
           )
         )
@@ -1190,7 +1208,7 @@ macro check*(conditions: untyped): untyped =
     result = newNimNode(nnkStmtList)
     for node in checked:
       if node.kind != nnkCommentStmt:
-        result.add(newCall(newIdentNode("check"), node))
+        result.add(newCall(checkSym, node))
 
   else:
     let lineinfo = newStrLitNode(checked.lineInfo)
@@ -1204,7 +1222,7 @@ macro check*(conditions: untyped): untyped =
             nnkCall.newTree(ident("not"), checked),
             nnkStmtList.newTree(
               nnkCall.newTree(
-                ident("checkpoint"),
+                checkpointSym,
                 nnkInfix.newTree(
                   ident("&"),
                   nnkInfix.newTree(
@@ -1215,7 +1233,7 @@ macro check*(conditions: untyped): untyped =
                   callLit
                 )
               ),
-              nnkCall.newTree(ident("fail"))
+              nnkCall.newTree(failSym)
             )
           )
         )
@@ -1295,7 +1313,7 @@ when unittest2PreviewIsolate:
     testStarted(test.testName)
 
     let runner = startProcess(
-      getAppFilename(),
+      getAppFilename2(),
       args = [test.suiteName & "::" & test.testName],
       env = newStringTable(
         "UNITTEST2_ISOLATED", "1",

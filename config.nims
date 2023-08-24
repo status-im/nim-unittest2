@@ -6,7 +6,7 @@ let verbose = getEnv("V", "") notin ["", "0"]
 let cfg =
   " --styleCheck:usages --styleCheck:error" &
   (if verbose: "" else: " --verbosity:0 --hints:off") &
-  " --skipParentCfg --skipUserCfg --outdir:build '--nimcache:build/nimcache/$projectName' -f"
+  " --skipParentCfg --skipUserCfg --outdir:build -f"
 
 proc build(args, path: string, cmdArgs = "") =
   exec nimc & " " & lang & " " & cfg & " " & flags & " " & args & " " & path & " " & cmdArgs
