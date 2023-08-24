@@ -36,8 +36,9 @@ task test, "Run tests":
     if not (f.len > 4 and f[^4..^1] == ".nim"): continue
 
     for compat in ["-d:unittest2Compat=false", "-d:unittest2Compat=true"]:
-      for level in ["VERBOSE", "COMPACT", "FAILURES", "NONE"]:
-        run "--threads:on " & " " & compat, f, "--output-level=" & level
+      for color in ["-d:nimUnittestColor=on", "-d:nimUnittestColor=off"]:
+        for level in ["VERBOSE", "COMPACT", "FAILURES", "NONE"]:
+          run "--threads:on " & " " & compat & " " & color, f, "--output-level=" & level
 
   testOptions()
 

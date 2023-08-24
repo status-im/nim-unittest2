@@ -471,8 +471,10 @@ method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
       else:
         "[Test   ]"
 
-  try: stdout.styledWrite "  ", fgBlue, alignLeft(counter, maxStatusLen + maxDurationLen + 7)
-  except CatchableError: discard
+  formatter.write do:
+    stdout.styledWrite "  ", fgBlue, alignLeft(counter, maxStatusLen + maxDurationLen + 7)
+  do:
+    stdout.write "  ", alignLeft(counter, maxStatusLen + maxDurationLen + 7)
 
   writeTestName(formatter, testName)
   echo ""
