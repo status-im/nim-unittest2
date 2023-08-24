@@ -448,13 +448,10 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
     stdout.write(counter, alignLeft(suiteName, maxNameLen), eol)
 
 proc writeTestName(formatter: ConsoleOutputFormatter, testName: string) =
-  template rawPrint() = echo(testName)
-  when useTerminal:
-    if formatter.colorOutput:
-      try: stdout.styledWrite fgBlue, testName
-      except CatchableError: rawPrint()
-    else: rawPrint()
-  else: rawPrint()
+  formatter.write do:
+    stdout.styledWrite fgBlue, testName
+  do:
+    stdout.write(testName)
 
 method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
   formatter.curTestName = testName
