@@ -3,10 +3,13 @@ let lang = getEnv("NIMLANG", "c") # Which backend (c/cpp/js)
 let flags = getEnv("NIMFLAGS", "") # Extra flags for the compiler
 let verbose = getEnv("V", "") notin ["", "0"]
 
+from os import quoteShell
+
 let cfg =
   " --styleCheck:usages --styleCheck:error" &
   (if verbose: "" else: " --verbosity:0 --hints:off") &
-  " --skipParentCfg --skipUserCfg --outdir:build -f"
+  " --skipParentCfg --skipUserCfg --outdir:build -f " &
+  quoteShell("--nimcache:build/nimcache/$projectName")
 
 proc build(args, path: string, cmdArgs = "") =
   exec nimc & " " & lang & " " & cfg & " " & flags & " " & args & " " & path & " " & cmdArgs
