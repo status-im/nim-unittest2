@@ -8,17 +8,9 @@
 
 {.push raises: [].}
 
-## :Authors: Zahary Karadjov, Ștefan Talpalaru
+## :Authors: Zahary Karadjov, Ștefan Talpalaru, Status Research and Development
 ##
-## This module implements boilerplate to make unit testing easy.
-##
-## The test status and name is printed after any output or traceback.
-##
-## Tests can be nested, however failure of a nested test will not mark the
-## parent test as failed. Setup and teardown are inherited. Setup can be
-## overridden locally.
-##
-## Compiled test files return the number of failed test as exit code, while
+## This module makes unit testing easy.
 ##
 ## .. code::
 ##   nim c -r testfile.nim
@@ -65,37 +57,26 @@
 ## Command line arguments
 ## ======================
 ##
-## --help      Print short help and quit
-## --xml:file  Write JUnit-compatible XML report to `file`
-## --console   Write report to the console (default, when no other output is
-##             selected)
+## The unit test runner recognises serveral parameters that can be specified
+## either via environment or command line, the latter taking precedence.
+##
+## Several options also have defaults that can be controlled at compile-time.
+##
+## --help             Print short help and quit
+## --xml:file         Write JUnit-compatible XML report to `file`
+## --console          Write report to the console (default, when no other output
+##                    is selected)
+## --output-lvl:level Verbosity of output [COMPACT, VERBOSE, FAILURES, NONE] (env: UNITTEST2_OUTPUT_LVL)
+## --verbose, -v      Shorthand for --output-lvl:VERBOSE
 ##
 ## Command line parsing can be disabled with `-d:unittest2DisableParamFiltering`.
 ##
 ## Running tests in parallel
 ## =========================
 ##
-## To enable the threadpool-based test parallelisation, "--threads:on" needs to
-## be passed to the compiler, along with "-d:nimtestParallel" or the
-## NIMTEST_PARALLEL environment variable:
-##
-## .. code::
-##
-##   nim c -r --threads:on -d:nimtestParallel testfile.nim
-##   # or
-##   NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim
-##
-## There are some implicit barriers where we wait for all the spawned jobs to
-## complete: before and after each test suite and at the main thread's exit.
-##
-## The suite-related barriers are there to avoid mixing test output, but they
-## also affect which groups of tests can be run in parallel, so keep them in
-## mind when deciding how many tests to place in different suites (or between
-## suites).
-##
-## You may sometimes need to disable test parallelisation for a specific test,
-## even though it was enabled in some configuration file in a parent dir. Do
-## this with "-d:nimtestParallelDisabled" which overrides everything else.
+## Early versions of this library had rudimentary support for running tests in
+## parallel - this has since been removed due to safety issues in the
+## implementation and may be reintroduced at a future date.
 ##
 ## Example
 ## -------
@@ -129,91 +110,94 @@
 ##     suiteTeardown:
 ##       echo "suite teardown: run once after the tests"
 
-import std/[locks, macros, sets, strutils, streams, times, monotimes]
+import std/[
+  macros, sequtils, sets, strutils, streams, tables, times, monotimes]
 
-{.warning[LockLevel]:off.}
+when defined(nimHasWarnBareExcept):
+  # In unit tests, we want to at least attempt to catch Exception no matter its
+  # UB
+  {.warning[BareExcept]: off.}
+
+{.warning[LockLevel]: off.}
 
 when declared(stdout):
   import std/os
 
-const useTerminal = not defined(js)
+const useTerminal = declared(stdout) and not defined(js)
 
-# compile with `-d:unittest2DisableParamFiltering` to skip parsing test filters,
-# `--help` and other command line options - you can manually call
-# `parseParameters` instead then.
-const autoParseArgs = not defined(unittest2DisableParamFiltering)
+type
+  OutputLevel* = enum  ## The output verbosity of the tests.
+    VERBOSE,     ## Print as much as possible.
+    COMPACT      ## Print failures and compact success information
+    FAILURES,    ## Print only failures
+    NONE         ## Print nothing.
+
+const
+  outputLevelDefault = COMPACT
+  slowThreshold = initDuration(seconds = 5)
+
+  # `unittest` compatibility
+  nimUnittestOutputLevel {.strdefine.} = $outputLevelDefault
+  nimUnittestColor {.strdefine.} = "auto" ## auto|on|off
+  nimUnittestAbortOnError {.booldefine.} = false
+
+  # `unittest2` compile-time configuration options
+  unittest2DisableParamFiltering {.booldefine.} = false
+    ## Disables automatic command line argument parsing - parsing is available
+    ## via the `parseParameters` function instead
+  unittest2Compat {.booldefine.} = true # This will be disabled in the future
+    ## Compatibility mode for `unittest` for easier porting and improved
+    ## backwards compatibility - no stability guarantees
+  unittest2NoCollect {.booldefine.} = false
+    ## Disable test collection mode where tests are enumerated before they are
+    ## run - in particular, this affects the order in which tests and suites
+    ## have their bodies evaluated and disables several features that require
+    ## knowing how many tests will be executed - experimental feature
+  unittest2PreviewIsolate {.booldefine.} = false
+    ## Preview isolation mode where each test is run in a separate process - may
+    ## be removed in the future
 
 when useTerminal:
   import std/terminal
 
-when declared(stdout):
-  const paralleliseTests* = (existsEnv("NIMTEST_PARALLEL") or defined(nimtestParallel) and not defined(nimtestParallelDisabled))
-    ## Whether parallel test running was enabled (set at compile time).
-    ## This constant might be useful in custom output formatters.
-else:
-  const paralleliseTests* = false
+const
+  collect = (not unittest2NoCollect and not unittest2Compat) or unittest2PreviewIsolate
+  autoParseArgs = not unittest2DisableParamFiltering
+  isolate = unittest2PreviewIsolate
+
+when isolate:
+  let
+    isolated = getEnv("UNITTEST2_ISOLATED") == "1"
+      ## Test is running in the isolated environment
 
 from std/exitprocs import nil
 template addExitProc(p: proc) =
-  when defined(nimHasWarnBareExcept):
-    {.warning[BareExcept]:off.}
-
   try:
     exitprocs.addExitProc(p)
   except Exception as e:
     echo "Can't add exit proc", e.msg
     quit(1)
 
-  when defined(nimHasWarnBareExcept):
-    {.warning[BareExcept]:on.}
-
-when paralleliseTests:
-  import threadpool
-
-  # repeatedly calling sync() without waiting for results - on procs that don't
-  # return any - doesn't work properly (probably due to gSomeReady getting its
-  # counter increased back to the pre-call value) so we're stuck with these
-  # dummy flowvars
-  # (`flowVars` will be initialized in each child thread, when using nested tests, by the compiler)
-  # TODO: try getting rid of them when nim-0.20.0 is released
-  var flowVars {.threadvar.}: seq[FlowVarBase]
-  proc repeatableSync*() =
-    sync()
-    for flowVar in flowVars:
-      blockUntil(flowVar[])
-    flowVars = @[]
-
-  # make sure all the spawned tests are done before exiting
-  # (this will be the last sync, so no need for repeatability)
-  let mainThreadID = getThreadId()
-  proc quitProc() {.noconv.} =
-    # "require" can exit from a worker thread and syncing in there would block
-    if getThreadId() == mainThreadID:
-      sync()
-  addExitProc(quitProc)
-
-  var outputLock: Lock # used by testEnded() to avoid mixed test outputs
-  initLock(outputLock)
-
 type
+  Test = object
+    suiteName: string
+    testName: string
+    impl: proc(suite, name: string): TestStatus
+
   TestStatus* = enum ## The status of a test when it is done.
     OK,
     FAILED,
     SKIPPED
 
-  OutputLevel* = enum  ## The output verbosity of the tests.
-    PRINT_ALL,         ## Print as much as possible.
-    PRINT_FAILURES,    ## Print only the failed tests.
-    PRINT_NONE         ## Print nothing.
-
   TestResult* = object
     suiteName*: string
       ## Name of the test suite that contains this test case.
-      ## Can be ``nil`` if the test case is not in a suite.
     testName*: string
       ## Name of the test case
     status*: TestStatus
     duration*: Duration # How long the test took, in seconds
+    output*: string
+    errors*: string
 
   OutputFormatter* = ref object of RootObj
 
@@ -229,12 +213,26 @@ type
       ## default to true, if `NIMTEST_COLOR` is undefined.
     outputLevel: OutputLevel
       ## Set the verbosity of test results.
-      ## Default is `PRINT_ALL`, or override with:
-      ## `-d:nimUnittestOutputLevel:PRINT_ALL|PRINT_FAILURES|PRINT_NONE`.
+      ## Default is `VERBOSE`, or override with:
+      ## `-d:nimUnittestOutputLevel:VERBOSE|FAILURES|NONE`.
       ##
       ## Deprecated: the `NIMTEST_OUTPUT_LVL` environment variable is set for the non-js target.
-    isInSuite: bool
-    isInTest: bool
+
+    when collect:
+      tests: Table[string, int]
+
+    curSuiteName: string
+    curSuite: int
+    curTestName: string
+    curTest: int
+
+    statuses: array[TestStatus, int]
+
+    results: seq[TestResult]
+
+    failures: seq[TestResult]
+
+    errors: string
 
   JUnitTest = object
     name: string
@@ -252,39 +250,36 @@ type
     suites: seq[JUnitSuite]
     currentSuite: int
 
+# TODO these globals are threadvar so as to avoid gc-safety-issues - this should
+#      probably be resolved in a better way down the line specially since we
+#      don't support threads _really_
+
 var
-  abortOnError* {.threadvar.}: bool ## Set to true in order to quit
-                                    ## immediately on fail. Default is false,
-                                    ## or override with `-d:nimUnittestAbortOnError:on|off`.
-                                    ##
-                                    ## Deprecated: can also override depending on whether
-                                    ## `NIMTEST_ABORT_ON_ERROR` environment variable is set.
+  abortOnError* {.threadvar.}: bool
+    ## Set to true in order to quit
+    ## immediately on fail. Default is false,
+    ## or override with `-d:nimUnittestAbortOnError:on|off`.
 
   checkpoints {.threadvar.}: seq[string]
-  formattersLock: Lock
-  formatters {.guard: formattersLock.}: seq[OutputFormatter]
-  testFiltersLock: Lock
-  testsFilters {.guard: testFiltersLock.}: HashSet[string]
+  formatters {.threadvar.}: seq[OutputFormatter]
+  testsFilters {.threadvar.}: HashSet[string]
 
-const
-  outputLevelDefault = PRINT_ALL
-  nimUnittestOutputLevel {.strdefine.} = $outputLevelDefault
-  nimUnittestColor {.strdefine.} = "auto" ## auto|on|off
-  nimUnittestAbortOnError {.booldefine.} = false
-
-initLock(formattersLock)
-initLock(testFiltersLock)
-
-template deprecateEnvVarHere() =
-  # xxx issue a runtime warning to deprecate this envvar.
-  discard
+when collect:
+  var
+    tests: OrderedTable[string, seq[Test]]
 
 abortOnError = nimUnittestAbortOnError
+
 when declared(stdout):
-  if existsEnv("NIMTEST_ABORT_ON_ERROR"):
-    deprecateEnvVarHere()
+  if existsEnv("UNITTEST2_ABORT_ON_ERROR") or existsEnv("NIMTEST_ABORT_ON_ERROR"):
     abortOnError = true
 
+when collect:
+  method suiteRunStarted*(
+      formatter: OutputFormatter, tests: OrderedTable[string, seq[Test]]) {.base, gcsafe.} =
+    # Run when a round of running discovered suites starts - these may result
+    # in subsequent tests being added meaning subsequent suite runs
+    discard
 method suiteStarted*(formatter: OutputFormatter, suiteName: string) {.base, gcsafe.} =
   discard
 method testStarted*(formatter: OutputFormatter, testName: string) {.base, gcsafe.} =
@@ -298,30 +293,60 @@ method testEnded*(formatter: OutputFormatter, testResult: TestResult) {.base, gc
   discard
 method suiteEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
   discard
+when collect:
+  method suiteRunEnded*(
+      formatter: OutputFormatter) {.base, gcsafe.} =
+    discard
+
 method testRunEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
   # Runs when the test executable is about to end, which is implemented using
-  # addQuitProc, a best-effort kind of place to do cleanups
-
+  # addExitProc, a best-effort kind of place to do cleanups
   discard
 
+when collect:
+  proc suiteRunStarted(tests: OrderedTable[string, seq[Test]]) =
+    for formatter in formatters:
+      formatter.suiteRunStarted(tests)
+
+proc suiteStarted(name: string) =
+  for formatter in formatters:
+    formatter.suiteStarted(name)
+
+proc testStarted(name: string) =
+  for formatter in formatters:
+    formatter.testStarted(name)
+
+proc testEnded(testResult: TestResult) =
+  for formatter in formatters:
+    formatter.testEnded(testResult)
+
+proc suiteEnded() =
+  for formatter in formatters:
+    formatter.suiteEnded()
+
+when collect:
+  proc suiteRunEnded() =
+    for formatter in formatters:
+      formatter.suiteRunEnded()
+
+proc testRunEnded() =
+  for formatter in formatters:
+    testRunEnded(formatter)
+
 proc addOutputFormatter*(formatter: OutputFormatter) =
-  withLock formattersLock:
-    {.gcsafe.}:
-      formatters.add(formatter)
+  formatters.add(formatter)
 
 proc resetOutputFormatters*() =
-  withLock formattersLock:
-    {.gcsafe.}:
-      formatters = @[]
+  formatters.reset()
 
 proc newConsoleOutputFormatter*(outputLevel: OutputLevel = outputLevelDefault,
                                 colorOutput = true): ConsoleOutputFormatter =
   ConsoleOutputFormatter(
     outputLevel: outputLevel,
-    colorOutput: colorOutput
+    colorOutput: colorOutput,
   )
 
-proc colorOutput(): bool =
+proc defaultColorOutput(): bool =
   let color = nimUnittestColor
   case color
   of "auto":
@@ -329,9 +354,10 @@ proc colorOutput(): bool =
     else: result = false
   of "on": result = true
   of "off": result = false
-  else: doAssert false, $color
+  else: raiseAssert "Unrecognised nimUnittestColor setting: " & color
 
   when declared(stdout):
+    # TODO unittest2-equivalent color parsing
     if existsEnv("NIMTEST_COLOR"):
       let colorEnv = getEnv("NIMTEST_COLOR")
       if colorEnv == "never":
@@ -341,80 +367,296 @@ proc colorOutput(): bool =
     elif existsEnv("NIMTEST_NO_COLOR"):
       result = false
 
-proc defaultConsoleFormatter*(): ConsoleOutputFormatter =
-  var colorOutput = colorOutput()
-  var outputLevel = static: nimUnittestOutputLevel.parseEnum[:OutputLevel]
+proc defaultOutputLevel(): OutputLevel =
   when declared(stdout):
-    const a = "NIMTEST_OUTPUT_LVL"
-    if existsEnv(a):
+    const levelEnv = "UNITTEST2_OUTPUT_LVL"
+    const nimtestEnv = "NIMTEST_OUTPUT_LVL"
+    if existsEnv(levelEnv):
       try:
-        outputLevel = getEnv(a).parseEnum[:OutputLevel]
-      except ValueError as exc:
-        echo "Cannot parse NIMTEST_OUTPUT_LVL: ", exc.msg
+        parseEnum[OutputLevel](getEnv(levelEnv))
+      except ValueError:
+        echo "Cannot parse UNITTEST2_OUTPUT_LVL: ", getEnv(levelEnv)
         quit 1
+    elif existsEnv(nimtestEnv):
+      # std-compatible parsing and translation
+      case toUpper(getEnv(nimtestEnv))
+      of "PRINT_ALL": OutputLevel.VERBOSE
+      of "PRINT_FAILURES": OutputLevel.FAILURES
+      of "PRINT_NONE": OutputLevel.NONE
+      else:
+        echo "Cannot parse NIMTEST_OUTPUT_LVL: ", getEnv(nimtestEnv)
+        quit 1
+    else:
+      const defaultLevel = static: nimUnittestOutputLevel.parseEnum[:OutputLevel]
+      defaultLevel
 
-  result = newConsoleOutputFormatter(outputLevel, colorOutput)
+proc defaultConsoleFormatter*(): ConsoleOutputFormatter =
+  newConsoleOutputFormatter(defaultOutputLevel(), defaultColorOutput())
 
-method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
-  template rawPrint() = echo("\n[Suite] ", suiteName)
+const
+  maxStatusLen = 7
+  maxDurationLen = 6
+
+when collect:
+  proc formatFraction(cur, total: int): string =
+    let
+      cur = $cur
+      total = $total
+    "[" & align(cur, max(0, maxStatusLen - total.len - 1)) & "/" & total & "]"
+
+template write(
+    formatter: ConsoleOutputFormatter, styled: untyped, unstyled: untyped) =
+  template ignoreExceptions(body: untyped) =
+    # We ignore exceptions throughout assuming there's no way to
+    try: body except CatchableError: discard
+
   when useTerminal:
     if formatter.colorOutput:
-      try:
-        styledEcho styleBright, fgBlue, "\n[Suite] ", resetStyle, suiteName
-      except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
-    else: rawPrint()
-  else: rawPrint()
-  formatter.isInSuite = true
+      ignoreExceptions: styled
+    else: ignoreExceptions: unstyled
+  else: ignoreExceptions: unstyled
+
+when collect:
+  method suiteRunStarted*(
+      formatter: ConsoleOutputFormatter, tests: OrderedTable[string, seq[Test]]) =
+    for k, v in tests:
+      formatter.tests[k] = v.len
+
+when collect:
+  method suiteRunEnded*(formatter: ConsoleOutputFormatter) =
+    formatter.tests.reset()
+
+method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
+  formatter.curSuiteName = suiteName
+  formatter.curSuite += 1
+
+  formatter.curTest.reset()
+
+  if formatter.outputLevel in {OutputLevel.FAILURES, OutputLevel.NONE}:
+    return
+
+  let
+    counter =
+      when collect: formatFraction(formatter.curSuite, formatter.tests.len) & " "
+      else:
+        if formatter.outputLevel == VERBOSE: "[Suite  ] " else: ""
+    maxNameLen = when collect: max(toSeq(formatter.tests.keys()).mapIt(it.len)) else: 0
+    eol = if formatter.outputLevel == VERBOSE: "\n" else: " "
+  formatter.write do:
+    stdout.styledWrite(styleBright, fgBlue, counter, alignLeft(suiteName, maxNameLen), eol)
+  do:
+    stdout.write(counter, alignLeft(suiteName, maxNameLen), eol)
+
+proc writeTestName(formatter: ConsoleOutputFormatter, testName: string) =
+  formatter.write do:
+    stdout.styledWrite fgBlue, testName
+  do:
+    stdout.write(testName)
 
 method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
-  formatter.isInTest = true
+  formatter.curTestName = testName
+  formatter.curTest += 1
+
+  if formatter.outputLevel != VERBOSE:
+    return
+
+  # In verbose mode, print a line when the test starts so that output can be
+  # correlated with the test that's currently running rather than misleadingly
+  # being printed just below the test that just finished running.
+  let
+    counter =
+      when collect:
+        try: formatFraction(formatter.curTest, formatter.tests[formatter.curSuiteName]) & " "
+        except CatchableError: ""
+      else:
+        "[Test   ]"
+
+  formatter.write do:
+    stdout.styledWrite "  ", fgBlue, alignLeft(counter, maxStatusLen + maxDurationLen + 7)
+  do:
+    stdout.write "  ", alignLeft(counter, maxStatusLen + maxDurationLen + 7)
+
+  writeTestName(formatter, testName)
+  echo ""
 
 method failureOccurred*(formatter: ConsoleOutputFormatter,
                         checkpoints: seq[string], stackTrace: string) =
   if stackTrace.len > 0:
-    echo stackTrace
-  let prefix = if formatter.isInSuite: "    " else: ""
+    formatter.errors.add(stackTrace)
+    formatter.errors.add("\n")
   for msg in items(checkpoints):
-    echo prefix, msg
+    formatter.errors.add("    ")
+    formatter.errors.add(msg)
+    formatter.errors.add("\n")
 
-let consoleShowTiming =
-  defined(unittestPrintTime) or
-  getEnv("NIMTEST_TIMING").toLowerAscii().startsWith("t")
+proc color(status: TestStatus): ForegroundColor =
+  case status
+  of TestStatus.OK: fgGreen
+  of TestStatus.FAILED: fgRed
+  of TestStatus.SKIPPED: fgYellow
+proc marker(status: TestStatus): string =
+  case status
+  of TestStatus.OK: "."
+  of TestStatus.FAILED: "F"
+  of TestStatus.SKIPPED: "s"
+
+proc formatDuration(dur: Duration, aligned = true): string =
+  let
+    seconds = dur.inMilliseconds.float / 1000.0
+    precision = max(3 - ($seconds.int).len, 1)
+    str = formatFloat(seconds, ffDecimal, precision)
+
+  if aligned:
+    "(" & align(str, maxDurationLen) & "s)"
+  else:
+    "(" & str & "s)"
+
+proc formatStatus(status: TestStatus): string =
+  "[" & alignLeft($status, maxStatusLen) & "]"
+
+proc getAppFilename2(): string =
+  # TODO https://github.com/nim-lang/Nim/pull/22544
+  try:
+    getAppFilename()
+  except OSError:
+    ""
+
+proc printFailureInfo(formatter: ConsoleOutputFormatter, testResult: TestResult) =
+  # Show how to re-run this test case
+  echo repeat('=', testResult.testName.len)
+  echo "  ", getAppFilename2(), " ", quoteShell(testResult.suiteName & "::" & testResult.testName)
+  echo repeat('-', testResult.testName.len)
+
+  # Show the output
+  if testResult.output.len > 0:
+    echo testResult.output
+  if testResult.errors.len > 0:
+    echo testResult.errors
+
+proc printTestResultStatus(formatter: ConsoleOutputFormatter, testResult: TestResult) =
+  let
+    status = formatStatus(testResult.status)
+    duration = formatDuration(testResult.duration)
+
+  formatter.write do:
+    stdout.styledWrite(
+      "  ", styleBright, testResult.status.color, status, " ")
+    if testResult.duration > slowThreshold:
+      stdout.styledWrite styleBright, duration
+    else:
+      stdout.write(duration)
+    stdout.write " ", testResult.testName
+  do:
+    stdout.styledWrite "  ", status, " ", duration, " ", testResult.testName
+  echo ""
 
 method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
-  formatter.isInTest = false
+  formatter.statuses[testResult.status] += 1
 
-  if formatter.outputLevel != OutputLevel.PRINT_NONE and
-      (formatter.outputLevel == OutputLevel.PRINT_ALL or testResult.status == TestStatus.FAILED):
+  if formatter.outputLevel == NONE:
+    return
+
+  var testResult = testResult
+  testResult.errors = move(formatter.errors)
+
+  formatter.results.add(testResult)
+
+  if formatter.outputLevel == VERBOSE and testResult.status == TestStatus.FAILED:
+    # We'll print it again when all tests have completed
+    formatter.failures.add testResult
+
+  if formatter.outputLevel in {VERBOSE, FAILURES}:
+    if testResult.status == TestStatus.FAILED:
+      printFailureInfo(formatter, testResult)
+    if formatter.outputLevel == VERBOSE or testResult.status == TestStatus.FAILED:
+      printTestResultStatus(formatter, testResult)
+  else:
+    # In compact mode, we use a small marker to mark progress within the suite -
+    # we have to be careful about line breaks and flushing so that the marker
+    # really ends up on the screen where it's supposed to
+    # TODO if the test writes to stdout, the display with be disrupted
+    #      capturing / redirecting stdout with `dup2` or process isolation could
+    #      fix this
+
     let
-      prefix = if testResult.suiteName.len > 0: "  " else: ""
-      testHeader =
-        if consoleShowTiming:
-          let
-            seconds = testResult.duration.inMilliseconds.float / 1000.0
-            precision = max(3 - ($seconds.int).len, 1)
-            formattedSeconds = formatFloat(seconds, ffDecimal, precision)
-          prefix & "[" & $testResult.status & " - " & formattedSeconds & "s] "
-        else:
-          prefix & "[" & $testResult.status & "] "
-    template rawPrint() = echo(testHeader, testResult.testName)
-    when useTerminal:
-      if formatter.colorOutput:
-        var color = case testResult.status
-          of TestStatus.OK: fgGreen
-          of TestStatus.FAILED: fgRed
-          of TestStatus.SKIPPED: fgYellow
-        try:
-          styledEcho styleBright, color, testHeader,
-              resetStyle, testResult.testName
-        except CatchableError: rawPrint() # Work around exceptions in `terminal.nim`
-      else:
-        rawPrint()
-    else:
-      rawPrint()
+      marker = testResult.status.marker()
+      color = testResult.status.color()
+    formatter.write do:
+        stdout.styledWrite styleBright, color, marker
+    do:
+      stdout.write marker
+    stdout.flushFile()
 
 method suiteEnded*(formatter: ConsoleOutputFormatter) =
-  formatter.isInSuite = false
+  if formatter.outputLevel == OutputLevel.NONE:
+    return
+
+  let
+    totalDur = formatter.results.foldl(a + b.duration, DurationZero)
+    totalDurStr = formatDuration(totalDur, false)
+
+  if formatter.outputLevel == OutputLevel.COMPACT:
+    # Complete the line with timing information
+    formatter.write do:
+      if totalDur > slowThreshold:
+        stdout.styledWrite(" ", styleBright, totalDurStr)
+      else:
+        stdout.write(" ", totalDurStr)
+      echo ""
+    do:
+      echo(" ", totalDurStr)
+
+  var failed = false
+  if formatter.outputLevel notin {VERBOSE, FAILURES}:
+    for testResult in formatter.results:
+      if testResult.status == TestStatus.FAILED:
+        failed = true
+        formatter.printFailureInfo(testResult)
+        formatter.printTestResultStatus(testResult)
+        echo ""
+
+  formatter.results.reset()
+
+  if failed or formatter.outputLevel == VERBOSE:
+    formatter.write do:
+      if totalDur > slowThreshold:
+        stdout.styledWrite styleBright, align(totalDurStr, maxStatusLen)
+      else:
+        stdout.write(align(totalDurStr, maxStatusLen))
+    do:
+      stdout.write(align(totalDurStr, maxStatusLen))
+
+    echo("   ", formatter.curSuiteName)
+    echo("")
+
+method testRunEnded*(formatter: ConsoleOutputFormatter) =
+  if formatter.outputLevel notin {VERBOSE, COMPACT} or
+      (formatter.outputLevel == FAILURES and
+        formatter.statuses[TestStatus.FAILED] > 0):
+    return
+
+  try:
+    let total = foldl(formatter.statuses, a + b, 0)
+    stdout.write("[Summary ] ", $total, " tests run: ")
+
+    var first = true
+    for s, c in formatter.statuses:
+      if first:
+        first = false
+      else:
+        stdout.write(", ")
+      if c > 0:
+        formatter.write do: stdout.styledWrite(s.color, $c, " ", $s)
+        do: stdout.write($c, " ", $s)
+      else:
+        stdout.write($c, " ", $s)
+    echo ""
+  except CatchableError: discard
+
+  # In verbose mode, it's likely failures got spammed away - print the specifics
+  # so that they can more easily be looked up:
+  for testResult in formatter.failures:
+    formatter.printTestResultStatus(testResult)
 
 proc xmlEscape(s: string): string =
   result = newStringOfCap(s.len)
@@ -479,7 +721,7 @@ method suiteEnded*(formatter: JUnitOutputFormatter) =
 func toFloatSeconds(duration: Duration): float64 =
   duration.inNanoseconds().float64 / 1_000_000_000.0
 
-proc writeTest(s: Stream, test: JUnitTest) {.raises: [Exception].} =
+proc writeTest(s: Stream, test: JUnitTest) {.raises: [CatchableError].} =
   let
     time = test.result.duration.toFloatSeconds()
     timeStr = time.formatFloat(ffDecimal, precision = 6)
@@ -517,7 +759,7 @@ proc countTests(counts: var (int, int, int, int, float), suite: JUnitSuite) =
       else:
         counts[1] += 1
 
-proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [Exception].} =
+proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [CatchableError].} =
   var counts: (int, int, int, int, float)
   countTests(counts, suite)
 
@@ -595,95 +837,63 @@ when defined(testing): export matchFilter
 proc shouldRun(currentSuiteName, testName: string): bool =
   ## Check if a test should be run by matching suiteName and testName against
   ## test filters.
-  withLock testFiltersLock:
-    {.gcsafe.}:
-      if testsFilters.len == 0:
-        return true
+  if testsFilters.len == 0:
+    return true
 
-      for f in testsFilters:
-        if matchFilter(currentSuiteName, testName, f):
-          return true
+  for f in testsFilters:
+    if matchFilter(currentSuiteName, testName, f):
+      return true
 
   return false
 
-proc cleanupFormatters() {.noconv.} =
-  withLock(formattersLock):
-    for f in formatters.mitems():
-      testRunEnded(f)
-
 proc parseParameters*(args: openArray[string]) =
-  withLock testFiltersLock:
-    withLock formattersLock:
-      # Read tests to run from the command line.
-      for str in args:
-        if str.startsWith("--help"):
-          echo "Usage: [--xml=file.xml] [--console] [test-name-glob]"
-          quit 0
-        elif str.startsWith("--xml"):
-          let fn = str[("--xml".len + 1)..^1] # skip separator char as well
-          try:
-            formatters.add(newJUnitOutputFormatter(
-              newFileStream(fn, fmWrite)))
-          except CatchableError as exc:
-            echo "Cannot open ", fn, " for writing: ", exc.msg
-            quit 1
-        elif str.startsWith("--console"):
-          formatters.add(defaultConsoleFormatter())
-        else:
-          testsFilters.incl(str)
+  var
+    hasConsole = false
+    hasXml: string
+    hasVerbose = false
+    hasLevel = defaultOutputLevel()
+
+  # Read tests to run from the command line.
+  for str in args:
+    if str.startsWith("--help"):
+      echo "Usage: [--xml=file.xml] [--console] [--output-level=[VERBOSE,COMPACT,FAILURES,NONE]] [test-name-glob]"
+      quit 0
+    elif str.startsWith("--xml:") or str.startsWith("--xml="):
+      hasXml = str[("--xml".len + 1)..^1] # skip separator char as well
+    elif str.startsWith("--console"):
+      hasConsole = true
+    elif str.startsWith("--output-level:") or str.startsWith("--output-level="):
+      hasLevel = try: parseEnum[OutputLevel](str[("--output-level".len + 1)..^1])
+        except ValueError:
+          echo "Unknown output level ", str[("--output-level".len + 1)..^1]
+          quit 1
+    elif str.startsWith("--verbose") or str == "-v":
+      hasVerbose = true
+    else:
+      testsFilters.incl(str)
+  if hasXml.len > 0:
+    try:
+      formatters.add(newJUnitOutputFormatter(newFileStream(hasXml, fmWrite)))
+    except CatchableError as exc:
+      echo "Cannot open ", hasXml, " for writing: ", exc.msg
+      quit 1
+
+  if hasConsole or hasXml.len == 0:
+    let level =
+      if hasVerbose: OutputLevel.VERBOSE
+      else: hasLevel
+    formatters.add(newConsoleOutputFormatter(level, defaultColorOutput()))
 
 proc ensureInitialized() =
   if autoParseArgs and declared(paramCount):
     parseParameters(commandLineParams())
 
-  withLock formattersLock:
-    if formatters.len == 0:
-      formatters = @[OutputFormatter(defaultConsoleFormatter())]
-
-  # Best-effort attempt to close formatters after the last test has run
-  addExitProc(cleanupFormatters)
+  if formatters.len == 0:
+    formatters = @[OutputFormatter(defaultConsoleFormatter())]
 
 ensureInitialized() # Run once!
 
-proc suiteStarted(name: string) =
-  when paralleliseTests:
-    repeatableSync() # wait for any independent tests from the threadpool before starting the suite
-  withLock formattersLock:
-    {.gcsafe.}:
-      for formatter in formatters:
-        let formatter = formatter # avoid lent iterator
-        formatter.suiteStarted(name)
-
-proc suiteEnded() =
-  when paralleliseTests:
-    repeatableSync() # wait for a suite's tests from the threadpool before moving on to the next suite
-  withLock formattersLock:
-    {.gcsafe.}:
-      for formatter in formatters:
-        let formatter = formatter # avoid lent iterator
-        formatter.suiteEnded()
-
-proc testStarted(name: string) =
-  withLock formattersLock:
-    {.gcsafe.}:
-      for formatter in formatters:
-        let formatter = formatter # avoid lent iterator
-        if not formatter.isNil:
-          # Useless check that somehow prevents a method dispatch failure on macOS
-          formatter.testStarted(name)
-
-proc testEnded(testResult: TestResult) =
-  withLock formattersLock:
-    {.gcsafe.}:
-      for formatter in formatters:
-        let formatter = formatter # avoid lent iterator
-        when paralleliseTests:
-          withLock outputLock:
-            formatter.testEnded(testResult)
-        else:
-          formatter.testEnded(testResult)
-
-template suite*(name, body) {.dirty.} =
+template suite*(nameParam: string, body: untyped) {.dirty.} =
   ## Declare a test suite identified by `name` with optional ``setup``
   ## and/or ``teardown`` section.
   ##
@@ -712,7 +922,7 @@ template suite*(name, body) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind suiteStarted, suiteEnded
+  bind collect, suiteStarted, suiteEnded
 
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
@@ -727,19 +937,19 @@ template suite*(name, body) {.dirty.} =
       var testSuiteTeardownIMPLFlag {.used.} = true
       template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
 
-    let testSuiteName {.used.} = name
+    let suiteName {.inject.} = nameParam
 
-    try:
-      suiteStarted(name)
-      body
-      when declared(testSuiteTeardownIMPLFlag):
-        when paralleliseTests:
-          repeatableSync()
-        testSuiteTeardownIMPL()
-    finally:
+    when not collect:
+      suiteStarted(suiteName)
+
+    # TODO what about exceptions in the suite itself?
+    body
+
+    when declared(testSuiteTeardownIMPLFlag):
+      testSuiteTeardownIMPL()
+
+    when not collect:
       suiteEnded()
-
-template exceptionTypeName(e: typed): string = $e.name
 
 template checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
@@ -770,24 +980,22 @@ template fail* =
   ## outputs "Checkpoint A" before quitting.
   when declared(testStatusIMPL):
     testStatusIMPL = TestStatus.FAILED
-  else:
-    programResult = 1
 
-  withLock formattersLock:
-    {.gcsafe.}:
-      for formatter in formatters:
-        let formatter = formatter # avoid lent iterator
-        when declared(stackTrace):
-          when stackTrace is string:
-            formatter.failureOccurred(checkpoints, stackTrace)
-          else:
-            formatter.failureOccurred(checkpoints, "")
-        else:
-          formatter.failureOccurred(checkpoints, "")
+  programResult = 1
+
+  for formatter in formatters:
+    let formatter = formatter # avoid lent iterator
+    when declared(stackTrace):
+      when stackTrace is string:
+        formatter.failureOccurred(checkpoints, stackTrace)
+      else:
+        formatter.failureOccurred(checkpoints, "")
+    else:
+      formatter.failureOccurred(checkpoints, "")
 
   if abortOnError: quit(1)
 
-  checkpoints = newSeq[string]()
+  checkpoints.reset()
 
 template skip* =
   ## Mark the test as skipped. Should be used directly
@@ -805,7 +1013,27 @@ template skip* =
   testStatusIMPL = TestStatus.SKIPPED
   checkpoints = @[]
 
-template test*(name: string, body: untyped) =
+proc runDirect(test: Test) =
+  let startTime = getMonoTime()
+  testStarted(test.testName)
+
+  # TODO this annotation works around a limitation where we know that we only
+  #      call the callback from the main thread but the compiler doesn't -
+  #      when / if testing becomes multithreaded, this will need a proper
+  #      solution
+  {.gcsafe.}:
+    let
+      status = test.impl(test.suiteName, test.testName)
+      duration = getMonoTime() - startTime
+
+  testEnded(TestResult(
+    suiteName: test.suiteName,
+    testName: test.testName,
+    status: status,
+    duration: duration
+  ))
+
+template test*(nameParam: string, body: untyped) =
   ## Define a single test case identified by `name`.
   ##
   ## .. code-block:: nim
@@ -819,24 +1047,12 @@ template test*(name: string, body: untyped) =
   ## .. code-block::
   ##
   ##  [OK] roses are red
-  bind shouldRun, checkpoints, testStarted, testEnded, exceptionTypeName
+  bind collect, runDirect, shouldRun, checkpoints
 
-  # `gensym` can't be in here because it's not a first-class pragma
-  when paralleliseTests:
-    # We use "fastcall" to get proper error messages about variable access that
-    # would make runTest() a closure - which we can't have in a spawned proc.
-    # "nimcall" doesn't work here, because of https://github.com/nim-lang/Nim/issues/8473
-    {.pragma: testrunner, gcsafe, fastcall.}
-  else:
-    {.pragma: testrunner.}
-
-  proc runTest(testSuiteName: string, testName: string): int {.gensym, testrunner.} =
-    checkpoints = @[]
+  proc runTest(suiteName, testName: string): TestStatus {.gensym.} =
     var testStatusIMPL {.inject.} = TestStatus.OK
-    let testName {.inject.} = testName
-
-    testStarted(testName)
-    let startTime = getMonoTime()
+    let suiteName {.inject, used.} = suiteName
+    let testName {.inject, used.} = testName
 
     try:
       when declared(testSetupIMPLFlag): testSetupIMPL()
@@ -846,49 +1062,47 @@ template test*(name: string, body: untyped) =
         body
 
     except CatchableError as e:
-      let eTypeDesc = "[" & exceptionTypeName(e) & "]"
-      checkpoint("Unhandled exception: " & e.msg & " " & eTypeDesc)
-      if e == nil: # foreign
-        fail()
-      else:
-        var stackTrace {.inject.} = e.getStackTrace()
-        fail()
+      let eTypeDesc = "[" & $e.name & "]"
+      checkpoint("Unhandled error: " & e.msg & " " & eTypeDesc)
+      var stackTrace {.inject.} = e.getStackTrace()
+      fail()
 
     except Defect as e: # This may or may not work dependings on --panics
-      let eTypeDesc = "[" & exceptionTypeName(e) & "]"
+      let eTypeDesc = "[" & $e.name & "]"
       checkpoint("Unhandled defect: " & e.msg & " " & eTypeDesc)
-      if e == nil: # foreign
-        fail()
-      else:
-        var stackTrace {.inject.} = e.getStackTrace()
-        fail()
+      var stackTrace {.inject.} = e.getStackTrace()
+      fail()
+    except Exception as e:
+      let eTypeDesc = "[" & $e.name & "]"
+      checkpoint("Unhandled exception that may cause undefined behavior: " & e.msg & " " & eTypeDesc)
+      var stackTrace {.inject.} = e.getStackTrace()
+      fail()
 
-    finally:
-      if testStatusIMPL == TestStatus.FAILED:
-        programResult = 1
-      let testResult = TestResult(
-        suiteName: testSuiteName,
-        testName: testName,
-        status: testStatusIMPL,
-        duration: getMonoTime() - startTime
-      )
-      testEnded(testResult)
-      checkpoints = @[]
+    checkpoints = @[]
 
-  let optionalTestSuiteName = when declared(testSuiteName): testSuiteName else: ""
-  let tname = name
-  if shouldRun(optionalTestSuiteName, tname):
-    when paralleliseTests:
-      flowVars.add(spawn runTest(optionalTestSuiteName, tname))
+    testStatusIMPL
+
+  let
+    localSuiteName =
+      when declared(suiteName):
+        suiteName
+      else: instantiationInfo().filename
+    localTestName = nameParam
+  if shouldRun(localSuiteName, localTestName):
+    let
+      instance =
+        Test(testName: localTestName, suiteName: localSuiteName, impl: runTest)
+    when collect:
+      tests.mgetOrPut(localSuiteName, default(seq[Test])).add(instance)
     else:
-      discard runTest(optionalTestSuiteName, tname)
+      runDirect(instance)
 
-{.pop.} # raises: [Defect]
+{.pop.} # raises: []
 
 macro check*(conditions: untyped): untyped =
   ## Verify if a statement or a list of statements is true.
   ## A helpful error message and set checkpoints are printed out on
-  ## failure (if ``outputLevel`` is not ``PRINT_NONE``).
+  ## failure (if ``outputLevel`` is not ``NONE``).
   runnableExamples:
     import std/strutils
 
@@ -950,11 +1164,17 @@ macro check*(conditions: untyped): untyped =
             else:
               result.check[i][1] = arg
 
+  let
+    checkpointSym = bindSym("checkpoint")
+    checkSym = bindSym("check")
+    failSym = bindSym("fail")
+
   case checked.kind
   of nnkCallKinds:
     let (assigns, check, printOuts) = inspectArgs(checked)
     let lineinfo = newStrLitNode(checked.lineInfo)
     let callLit = checked.toStrLit
+    let checkpointSym = bindSym("checkpoint")
     result = nnkBlockStmt.newTree(
       newEmptyNode(),
       nnkStmtList.newTree(
@@ -964,7 +1184,7 @@ macro check*(conditions: untyped): untyped =
             nnkCall.newTree(ident("not"), check),
             nnkStmtList.newTree(
               nnkCall.newTree(
-                ident("checkpoint"),
+                checkpointSym,
                 nnkInfix.newTree(
                   ident("&"),
                   nnkInfix.newTree(
@@ -976,7 +1196,7 @@ macro check*(conditions: untyped): untyped =
                 )
               ),
               printOuts,
-              nnkCall.newTree(ident("fail"))
+              nnkCall.newTree(failSym)
             )
           )
         )
@@ -987,7 +1207,7 @@ macro check*(conditions: untyped): untyped =
     result = newNimNode(nnkStmtList)
     for node in checked:
       if node.kind != nnkCommentStmt:
-        result.add(newCall(newIdentNode("check"), node))
+        result.add(newCall(checkSym, node))
 
   else:
     let lineinfo = newStrLitNode(checked.lineInfo)
@@ -1001,7 +1221,7 @@ macro check*(conditions: untyped): untyped =
             nnkCall.newTree(ident("not"), checked),
             nnkStmtList.newTree(
               nnkCall.newTree(
-                ident("checkpoint"),
+                checkpointSym,
                 nnkInfix.newTree(
                   ident("&"),
                   nnkInfix.newTree(
@@ -1012,7 +1232,7 @@ macro check*(conditions: untyped): untyped =
                   callLit
                 )
               ),
-              nnkCall.newTree(ident("fail"))
+              nnkCall.newTree(failSym)
             )
           )
         )
@@ -1072,3 +1292,114 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
 proc disableParamFiltering* {.deprecated:
     "Compile with -d:unittest2DisableParamFiltering instead".} =
   discard
+
+when unittest2PreviewIsolate:
+  import std/[osproc, strtabs]
+  proc runIsolated(test: Test) =
+    # Run test in an isolated process - this has the advantage that we can
+    # trivially capture stdout but has a number of problems:
+    # * suite and other global stuff gets executed for each test
+    #   * on unix, `fork` could work around this but not on windows
+    # * there's no good way to separate errors from stdout
+    # * there's process overhead
+    #
+    # There are advantages too:
+    # * reduced cross-test pollution
+    # * simple to parallelise
+    # * we can abort long-running tests after a timeout
+
+    let startTime = getMonoTime()
+    testStarted(test.testName)
+
+    let runner = startProcess(
+      getAppFilename2(),
+      args = [test.suiteName & "::" & test.testName],
+      env = newStringTable(
+        "UNITTEST2_ISOLATED", "1",
+        StringTableMode.modeCaseSensitive),
+      options = {poStdErrToStdOut})
+
+    close(runner.inputStream) # EOF so the test doesn't think it'll get input
+
+    var output: string
+
+    while true:
+      let pos = output.len
+      output.setLen(pos + 4096)
+
+      let bytes = runner.outputStream.readData(addr output[pos], 4096)
+      if bytes >= 0:
+        output.setLen(pos + bytes)
+
+      if bytes <= 0:
+        break
+
+    let status = runner.waitForExit()
+
+    runner.close()
+
+    testEnded(TestResult(
+      suiteName: test.suiteName,
+      testName: test.testName,
+      status: if status == 0: TestStatus.OK else: TestStatus.FAILED,
+      duration: getMonoTime() - startTime,
+      output: output
+    ))
+
+  type
+    IsolatedFormatter* = ref object of OutputFormatter
+        ## Formatter suitable for using the process-isolated environment
+        ##
+        ## This is a work in progress with several open issues
+        ## * we could use stderr for "unittest" traffic but it would be
+        ##   compromised by application output (typically ok in nim) and makes
+        ##   reading messy
+        ## * we could print all errors after test providing some sort of
+        ##   separator - has escape issues
+        ## * we could redirect stdout/stderr to a file and use stdout for errors
+        ## * as an addon to the above, we could read back the file then print
+        ##   a structured test format to stdout which the parent process can
+        ##   capture easily
+
+  if isolated:
+    formatters.add(IsolatedFormatter())
+
+  method failureOccurred*(formatter: IsolatedFormatter,
+                          checkpoints: seq[string], stackTrace: string) =
+    if stackTrace.len > 0:
+      echo(stackTrace)
+      echo("\n")
+    for msg in items(checkpoints):
+      echo("    ")
+      echo(msg)
+      echo("\n")
+
+when collect:
+  proc runScheduledTests() {.noconv.} =
+    # Tests can be added inside tests - this is weird and only partially
+    # supported
+    while tests.len > 0:
+      var tmp = move(tests)
+      suiteRunStarted(tmp)
+      for suiteName, suite in tmp:
+        if suite.len == 0: continue
+
+        suiteStarted(suiteName)
+        for test in suite:
+          when isolate:
+            if not isolated:
+              runIsolated(test)
+            else:
+              runDirect(test)
+          else:
+            runDirect(test)
+
+        suiteEnded()
+
+      suiteRunEnded()
+    testRunEnded()
+
+  addExitProc(runScheduledTests)
+
+else:
+  addExitProc(proc() {.noconv.} = testRunEnded())
