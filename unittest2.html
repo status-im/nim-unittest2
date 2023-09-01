@@ -67,22 +67,25 @@
   ## Deprecated: the environment variable `NIMTEST_NO_COLOR`, when set, changes the
   ## default to true, if `NIMTEST_COLOR` is undefined.
   ## Set the verbosity of test results.
-  ## Default is `PRINT_ALL`, or override with:
-  ## `-d:nimUnittestOutputLevel:PRINT_ALL|PRINT_FAILURES|PRINT_NONE`.
+  ## Default is `VERBOSE`, or override with:
+  ## `-d:nimUnittestOutputLevel:VERBOSE|FAILURES|NONE`.
   ## 
-  ## Deprecated: the `NIMTEST_OUTPUT_LVL` environment variable is set for the non-js target.">ConsoleOutputFormatter</a></li>
+  ## Deprecated: the `NIMTEST_OUTPUT_LVL` environment variable is set for the non-js target.
+  when collect:">ConsoleOutputFormatter</a></li>
 <li><a class="reference" href="#JUnitOutputFormatter" title="JUnitOutputFormatter = ref object of OutputFormatter">JUnitOutputFormatter</a></li>
 <li><a class="reference" href="#OutputFormatter" title="OutputFormatter = ref object of RootObj">OutputFormatter</a></li>
 <li><a class="reference" href="#OutputLevel" title="OutputLevel = enum
-  PRINT_ALL,                ## Print as much as possible.
-  PRINT_FAILURES,           ## Print only the failed tests.
-  PRINT_NONE                 ## Print nothing.">OutputLevel</a></li>
+  VERBOSE,                  ## Print as much as possible.
+  COMPACT,                  ## Print failures and compact success information
+  FAILURES,                 ## Print only failures
+  NONE                       ## Print nothing.">OutputLevel</a></li>
 <li><a class="reference" href="#TestResult" title="TestResult = object
-  suiteName*: string ## Name of the test suite that contains this test case.
-                     ## Can be ``nil`` if the test case is not in a suite.
+  suiteName*: string         ## Name of the test suite that contains this test case.
   testName*: string          ## Name of the test case
   status*: TestStatus
-  duration*: Duration">TestResult</a></li>
+  duration*: Duration
+  output*: string
+  errors*: string">TestResult</a></li>
 <li><a class="reference" href="#TestStatus" title="TestStatus = enum
   OK, FAILED, SKIPPED">TestStatus</a></li>
 
@@ -94,15 +97,6 @@
     <summary><a class="reference reference-toplevel" href="#8" id="58">Vars</a></summary>
     <ul class="simple simple-toc-section">
       <li><a class="reference" href="#abortOnError" title="abortOnError {.threadvar.}: bool">abortOnError</a></li>
-
-    </ul>
-  </details>
-</li>
-<li>
-  <details open>
-    <summary><a class="reference reference-toplevel" href="#10" id="60">Consts</a></summary>
-    <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#paralleliseTests" title="paralleliseTests = false">paralleliseTests</a></li>
 
     </ul>
   </details>
@@ -180,7 +174,8 @@
 
 </ul>
 <ul class="simple nested-toc-section">testRunEnded
-  <li><a class="reference" href="#testRunEnded.e%2CJUnitOutputFormatter" title="testRunEnded(formatter: JUnitOutputFormatter)">testRunEnded(formatter: JUnitOutputFormatter)</a></li>
+  <li><a class="reference" href="#testRunEnded.e%2CConsoleOutputFormatter" title="testRunEnded(formatter: ConsoleOutputFormatter)">testRunEnded(formatter: ConsoleOutputFormatter)</a></li>
+<li><a class="reference" href="#testRunEnded.e%2CJUnitOutputFormatter" title="testRunEnded(formatter: JUnitOutputFormatter)">testRunEnded(formatter: JUnitOutputFormatter)</a></li>
 <li><a class="reference" href="#testRunEnded.e%2COutputFormatter" title="testRunEnded(formatter: OutputFormatter)">testRunEnded(formatter: OutputFormatter)</a></li>
 
 </ul>
@@ -231,11 +226,11 @@
 
 </ul>
 <ul class="simple nested-toc-section">suite
-  <li><a class="reference" href="#suite.t%2C%2C" title="suite(name, body)">suite(name, body)</a></li>
+  <li><a class="reference" href="#suite.t%2Cstring%2Cuntyped" title="suite(nameParam: string; body: untyped)">suite(nameParam: string; body: untyped)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">test
-  <li><a class="reference" href="#test.t%2Cstring%2Cuntyped" title="test(name: string; body: untyped)">test(name: string; body: untyped)</a></li>
+  <li><a class="reference" href="#test.t%2Cstring%2Cuntyped" title="test(nameParam: string; body: untyped)">test(nameParam: string; body: untyped)</a></li>
 
 </ul>
 
@@ -252,11 +247,8 @@
 
     <div id="tocRoot"></div>
     
-    <p class="module-desc"><table class="docinfo" frame="void" rules="none"><col class="docinfo-name" /><col class="docinfo-content" /><tbody valign="top"><tr><th class="docinfo-name">Authors:</th><td>Zahary Karadjov, Ștefan Talpalaru</td></tr>
-</tbody></table><p>This module implements boilerplate to make unit testing easy.</p>
-<p>The test status and name is printed after any output or traceback.</p>
-<p>Tests can be nested, however failure of a nested test will not mark the parent test as failed. Setup and teardown are inherited. Setup can be overridden locally.</p>
-<p>Compiled test files return the number of failed test as exit code, while</p>
+    <p class="module-desc"><table class="docinfo" frame="void" rules="none"><col class="docinfo-name" /><col class="docinfo-content" /><tbody valign="top"><tr><th class="docinfo-name">Authors:</th><td>Zahary Karadjov, Ștefan Talpalaru, Status Research and Development</td></tr>
+</tbody></table><p>This module makes unit testing easy.</p>
 <pre class="listing">nim c -r testfile.nim</pre><p>exits with 0 or 1.</p>
 
 <h1><a class="toc-backref" id="running-individual-tests" href="#running-individual-tests">Running individual tests</a></h1><p>Specify the test names as command line arguments.</p>
@@ -272,17 +264,16 @@ nim c -r test &quot;fast_suite::mytest*&quot;
 nim c -r test &quot;auth*::&quot; &quot;crypto::hashing*&quot;
 # Run suites starting with 'bug #' and standalone tests starting with '#'
 nim c -r test 'bug #*::' '::#*'</pre>
-<h1><a class="toc-backref" id="command-line-arguments" href="#command-line-arguments">Command line arguments</a></h1><div class="option-list"><div class="option-list-item odd"><div class="option-list-label"><tt><span class="option">--help</span></tt></div><div class="option-list-description">Print short help and quit</div></div>
+<h1><a class="toc-backref" id="command-line-arguments" href="#command-line-arguments">Command line arguments</a></h1><p>The unit test runner recognises serveral parameters that can be specified either via environment or command line, the latter taking precedence.</p>
+<p>Several options also have defaults that can be controlled at compile-time.</p>
+<div class="option-list"><div class="option-list-item odd"><div class="option-list-label"><tt><span class="option">--help</span></tt></div><div class="option-list-description">Print short help and quit</div></div>
 <div class="option-list-item"><div class="option-list-label"><tt><span class="option">--xml:file</span></tt></div><div class="option-list-description">Write JUnit-compatible XML report to <tt class="docutils literal"><span class="pre"><span class="Identifier">file</span></span></tt></div></div>
 <div class="option-list-item odd"><div class="option-list-label"><tt><span class="option">--console</span></tt></div><div class="option-list-description">Write report to the console (default, when no other output is selected)</div></div>
+<div class="option-list-item"><div class="option-list-label"><tt><span class="option">--output-lvl:level Verbosity of output [COMPACT, VERBOSE, FAILURES, NONE] (env: UNITTEST2_OUTPUT_LVL)</span></tt></div><div class="option-list-description"></div></div>
+<div class="option-list-item odd"><div class="option-list-label"><tt><span class="option">--verbose, -v</span></tt></div><div class="option-list-description">Shorthand for --output-lvl:VERBOSE</div></div>
 </div><p>Command line parsing can be disabled with <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">unittest2DisableParamFiltering</span></span></tt>.</p>
 
-<h1><a class="toc-backref" id="running-tests-in-parallel" href="#running-tests-in-parallel">Running tests in parallel</a></h1><p>To enable the threadpool-based test parallelisation, &quot;--threads:on&quot; needs to be passed to the compiler, along with &quot;-d:nimtestParallel&quot; or the NIMTEST_PARALLEL environment variable:</p>
-<pre class="listing">nim c -r --threads:on -d:nimtestParallel testfile.nim
-# or
-NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some implicit barriers where we wait for all the spawned jobs to complete: before and after each test suite and at the main thread's exit.</p>
-<p>The suite-related barriers are there to avoid mixing test output, but they also affect which groups of tests can be run in parallel, so keep them in mind when deciding how many tests to place in different suites (or between suites).</p>
-<p>You may sometimes need to disable test parallelisation for a specific test, even though it was enabled in some configuration file in a parent dir. Do this with &quot;-d:nimtestParallelDisabled&quot; which overrides everything else.</p>
+<h1><a class="toc-backref" id="running-tests-in-parallel" href="#running-tests-in-parallel">Running tests in parallel</a></h1><p>Early versions of this library had rudimentary support for running tests in parallel - this has since been removed due to safety issues in the implementation and may be reintroduced at a future date.</p>
 
 <h2><a class="toc-backref" id="running-tests-in-parallel-example" href="#running-tests-in-parallel-example">Example</a></h2><pre class="listing"><span class="Identifier">suite</span> <span class="StringLit">&quot;description for this stuff&quot;</span><span class="Punctuation">:</span>
   <span class="Identifier">echo</span> <span class="StringLit">&quot;suite setup: run once before the tests&quot;</span>
@@ -324,16 +315,18 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <span class="Comment">## Deprecated: the environment variable `NIMTEST_NO_COLOR`, when set, changes the</span>
   <span class="Comment">## default to true, if `NIMTEST_COLOR` is undefined.</span>
   <span class="Comment">## Set the verbosity of test results.</span>
-  <span class="Comment">## Default is `PRINT_ALL`, or override with:</span>
-  <span class="Comment">## `-d:nimUnittestOutputLevel:PRINT_ALL|PRINT_FAILURES|PRINT_NONE`.</span>
+  <span class="Comment">## Default is `VERBOSE`, or override with:</span>
+  <span class="Comment">## `-d:nimUnittestOutputLevel:VERBOSE|FAILURES|NONE`.</span>
   <span class="Comment">## </span>
   <span class="Comment">## Deprecated: the `NIMTEST_OUTPUT_LVL` environment variable is set for the non-js target.</span>
+  <span class="Keyword">when</span> <span class="Identifier">collect</span><span class="Other">:</span>
+    
   </pre></dt>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L220" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L220" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L204" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L204" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -343,8 +336,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L249" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L249" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L247" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L247" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -353,37 +346,39 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L218" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L218" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L202" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L202" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
 <div id="OutputLevel">
   <dt><pre><a href="unittest2.html#OutputLevel"><span class="Identifier">OutputLevel</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
-  <span class="Identifier">PRINT_ALL</span><span class="Other">,</span>                <span class="Comment">## Print as much as possible.</span>
-  <span class="Identifier">PRINT_FAILURES</span><span class="Other">,</span>           <span class="Comment">## Print only the failed tests.</span>
-  <span class="Identifier">PRINT_NONE</span>                 <span class="Comment">## Print nothing.</span></pre></dt>
+  <span class="Identifier">VERBOSE</span><span class="Other">,</span>                  <span class="Comment">## Print as much as possible.</span>
+  <span class="Identifier">COMPACT</span><span class="Other">,</span>                  <span class="Comment">## Print failures and compact success information</span>
+  <span class="Identifier">FAILURES</span><span class="Other">,</span>                 <span class="Comment">## Print only failures</span>
+  <span class="Identifier">NONE</span>                       <span class="Comment">## Print nothing.</span></pre></dt>
   <dd>
     
     The output verbosity of the tests.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L204" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L204" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L129" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L129" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
 <div id="TestResult">
   <dt><pre><a href="unittest2.html#TestResult"><span class="Identifier">TestResult</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
-  <span class="Identifier">suiteName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Comment">## Name of the test suite that contains this test case.</span>
-                     <span class="Comment">## Can be ``nil`` if the test case is not in a suite.</span>
+  <span class="Identifier">suiteName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>         <span class="Comment">## Name of the test suite that contains this test case.</span>
   <span class="Identifier">testName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>          <span class="Comment">## Name of the test case</span>
   <span class="Identifier">status</span><span class="Operator">*</span><span class="Other">:</span> <a href="unittest2.html#TestStatus"><span class="Identifier">TestStatus</span></a>
   <span class="Identifier">duration</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Duration</span>
+  <span class="Identifier">output</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">errors</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L209" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L209" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L192" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L192" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -393,8 +388,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     The status of a test when it is done.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L199" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L199" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L187" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L187" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -408,27 +403,9 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dt><pre><a href="unittest2.html#abortOnError"><span class="Identifier">abortOnError</span></a> {.<span class="Identifier">threadvar</span>.}<span class="Other">:</span> <span class="Identifier">bool</span></pre></dt>
   <dd>
     
-    <p>Set to true in order to quit immediately on fail. Default is false, or override with <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">nimUnittestAbortOnError</span><span class="Punctuation">:</span><span class="Identifier">on</span><span class="Operator">|</span><span class="Identifier">off</span></span></tt>.</p>
-<p>Deprecated: can also override depending on whether <tt class="docutils literal"><span class="pre"><span class="Identifier">NIMTEST_ABORT_ON_ERROR</span></span></tt> environment variable is set.</p>
-
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L256" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L256" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
-
-  </dd>
-</div>
-
-  </dl>
-</div>
-<div class="section" id="10">
-  <h1><a class="toc-backref" href="#10">Consts</a></h1>
-  <dl class="item">
-    <div id="paralleliseTests">
-  <dt><pre><a href="unittest2.html#paralleliseTests"><span class="Identifier">paralleliseTests</span></a> <span class="Other">=</span> <span class="DecNumber">false</span></pre></dt>
-  <dd>
-    
-    Whether parallel test running was enabled (set at compile time). This constant might be useful in custom output formatters.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L150" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L150" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    Set to true in order to quit immediately on fail. Default is false, or override with <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">nimUnittestAbortOnError</span><span class="Punctuation">:</span><span class="Identifier">on</span><span class="Operator">|</span><span class="Identifier">off</span></span></tt>.
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L258" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L258" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -445,8 +422,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L307" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L307" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L336" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L336" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -459,8 +436,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L344" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L344" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L393" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L393" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -476,8 +453,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 </div>
 
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1072" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1072" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1292" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1292" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -491,8 +468,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L317" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L317" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L342" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L342" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -505,8 +482,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     Creates a formatter that writes report to the specified stream in JUnit format. The <tt class="docutils literal"><span class="pre">stream</span></tt> is NOT closed automatically when the test are finished, because the formatter has no way to know when all tests are finished. You should invoke formatter.close() to finalize the report.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L434" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L434" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L676" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L676" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -515,12 +492,12 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <div id="parseParameters-procs-all">
   <div id="parseParameters,openArray[string]">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseParameters%2CopenArray%5Bstring%5D"><span class="Identifier">parseParameters</span></a><span class="Other">(</span><span class="Identifier">args</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadEnvEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadEnvEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L614" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L614" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L849" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L849" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -532,8 +509,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L312" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L312" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L339" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L339" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -553,8 +530,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L372" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L372" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L482" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L482" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -565,8 +542,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     <tt class="docutils literal"><span class="pre">stackTrace</span></tt> is provided only if the failure occurred due to an exception. <tt class="docutils literal"><span class="pre">checkpoints</span></tt> is never <tt class="docutils literal"><span class="pre">nil</span></tt>.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L464" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L464" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L706" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L706" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -577,8 +554,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     <tt class="docutils literal"><span class="pre">stackTrace</span></tt> is provided only if the failure occurred due to an exception. <tt class="docutils literal"><span class="pre">checkpoints</span></tt> is never <tt class="docutils literal"><span class="pre">nil</span></tt>.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L292" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L292" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L287" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L287" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -586,13 +563,13 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 </div>
 <div id="suiteEnded-methods-all">
   <div id="suiteEnded.e,ConsoleOutputFormatter">
-  <dt><pre><span class="Keyword">method</span> <a href="#suiteEnded.e%2CConsoleOutputFormatter"><span class="Identifier">suiteEnded</span></a><span class="Other">(</span><span class="Identifier">formatter</span><span class="Other">:</span> <a href="unittest2.html#ConsoleOutputFormatter"><span class="Identifier">ConsoleOutputFormatter</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">method</span> <a href="#suiteEnded.e%2CConsoleOutputFormatter"><span class="Identifier">suiteEnded</span></a><span class="Other">(</span><span class="Identifier">formatter</span><span class="Other">:</span> <a href="unittest2.html#ConsoleOutputFormatter"><span class="Identifier">ConsoleOutputFormatter</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L416" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L416" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L590" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L590" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -602,8 +579,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L476" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L476" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L718" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L718" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -613,8 +590,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L299" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L299" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L294" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L294" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -627,8 +604,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L358" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L358" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L429" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L429" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -638,8 +615,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L457" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L457" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L699" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L699" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -649,8 +626,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L288" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L288" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L283" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L283" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -659,12 +636,12 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <div id="testEnded-methods-all">
   <div id="testEnded.e,ConsoleOutputFormatter,TestResult">
   <dt><pre><span class="Keyword">method</span> <a href="#testEnded.e%2CConsoleOutputFormatter%2CTestResult"><span class="Identifier">testEnded</span></a><span class="Other">(</span><span class="Identifier">formatter</span><span class="Other">:</span> <a href="unittest2.html#ConsoleOutputFormatter"><span class="Identifier">ConsoleOutputFormatter</span></a><span class="Other">;</span> <span class="Identifier">testResult</span><span class="Other">:</span> <a href="unittest2.html#TestResult"><span class="Identifier">TestResult</span></a><span class="Other">)</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L384" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L384" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L553" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L553" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -674,8 +651,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L473" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L473" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L715" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L715" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -685,22 +662,33 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L297" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L297" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L292" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L292" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
 
 </div>
 <div id="testRunEnded-methods-all">
-  <div id="testRunEnded.e,JUnitOutputFormatter">
+  <div id="testRunEnded.e,ConsoleOutputFormatter">
+  <dt><pre><span class="Keyword">method</span> <a href="#testRunEnded.e%2CConsoleOutputFormatter"><span class="Identifier">testRunEnded</span></a><span class="Other">(</span><span class="Identifier">formatter</span><span class="Other">:</span> <a href="unittest2.html#ConsoleOutputFormatter"><span class="Identifier">ConsoleOutputFormatter</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L632" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L632" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+
+  </dd>
+</div>
+<div id="testRunEnded.e,JUnitOutputFormatter">
   <dt><pre><span class="Keyword">method</span> <a href="#testRunEnded.e%2CJUnitOutputFormatter"><span class="Identifier">testRunEnded</span></a><span class="Other">(</span><span class="Identifier">formatter</span><span class="Other">:</span> <a href="unittest2.html#JUnitOutputFormatter"><span class="Identifier">JUnitOutputFormatter</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Completes the report and closes the underlying stream.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L534" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L534" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L776" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L776" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -720,12 +708,12 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <div id="testStarted-methods-all">
   <div id="testStarted.e,ConsoleOutputFormatter,string">
   <dt><pre><span class="Keyword">method</span> <a href="#testStarted.e%2CConsoleOutputFormatter%2Cstring"><span class="Identifier">testStarted</span></a><span class="Other">(</span><span class="Identifier">formatter</span><span class="Other">:</span> <a href="unittest2.html#ConsoleOutputFormatter"><span class="Identifier">ConsoleOutputFormatter</span></a><span class="Other">;</span> <span class="Identifier">testName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L369" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L369" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L456" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L456" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -735,8 +723,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L461" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L461" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L703" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L703" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -746,8 +734,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L290" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L290" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L285" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L285" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -764,7 +752,7 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dt><pre><span class="Keyword">macro</span> <a href="#check.m%2Cuntyped"><span class="Identifier">check</span></a><span class="Other">(</span><span class="Identifier">conditions</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
   <dd>
     
-    Verify if a statement or a list of statements is true. A helpful error message and set checkpoints are printed out on failure (if <tt class="docutils literal"><span class="pre">outputLevel</span></tt> is not <tt class="docutils literal"><span class="pre">PRINT_NONE</span></tt>).
+    Verify if a statement or a list of statements is true. A helpful error message and set checkpoints are printed out on failure (if <tt class="docutils literal"><span class="pre">outputLevel</span></tt> is not <tt class="docutils literal"><span class="pre">NONE</span></tt>).
 <p><strong class="examples_text">Example:</strong></p>
 <pre class="listing"><span class="Keyword">import</span> <span class="Identifier">std</span><span class="Operator">/</span><span class="Identifier">strutils</span>
 
@@ -775,8 +763,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <span class="Identifier">check</span><span class="Punctuation">:</span>
   <span class="StringLit">&quot;AKB48&quot;</span><span class="Operator">.</span><span class="Identifier">toLowerAscii</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">==</span> <span class="StringLit">&quot;akb48&quot;</span>
   <span class="CharLit">'C'</span> <span class="Keyword">notin</span> <span class="Identifier">teams</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L888" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L888" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1102" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1102" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -800,8 +788,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 
 <span class="Identifier">expect</span> <span class="Identifier">IOError</span><span class="Punctuation">,</span> <span class="Identifier">OSError</span><span class="Punctuation">,</span> <span class="Identifier">ValueError</span><span class="Punctuation">,</span> <span class="Identifier">AssertionDefect</span><span class="Punctuation">:</span>
   <span class="Identifier">defectiveRobot</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1032" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1032" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1252" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1252" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -822,8 +810,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <span class="Identifier">check</span><span class="Punctuation">(</span><span class="Punctuation">(</span><span class="DecNumber">42</span><span class="Punctuation">,</span> <span class="StringLit">&quot;the Answer to life and everything&quot;</span><span class="Punctuation">)</span> <span class="Operator">==</span> <span class="Punctuation">(</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="StringLit">&quot;a&quot;</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
 <span class="Identifier">checkpoint</span><span class="Punctuation">(</span><span class="StringLit">&quot;Checkpoint B&quot;</span><span class="Punctuation">)</span></pre><p>outputs &quot;Checkpoint A&quot; once it fails.</p>
 
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L744" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L744" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L954" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L954" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -838,8 +826,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <span class="Identifier">complicatedProcInThread</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 <span class="Identifier">fail</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre><p>outputs &quot;Checkpoint A&quot; before quitting.</p>
 
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L758" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L758" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L968" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L968" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -851,8 +839,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
   <dd>
     
     Same as <tt class="docutils literal"><span class="pre"><span class="Identifier">check</span></span></tt> except any failed test causes the program to quit immediately. Any teardown statements are not executed and the failed test output is not generated.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1022" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1022" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1242" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1242" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -865,16 +853,16 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
     
     Mark the test as skipped. Should be used directly in case when it is not possible to perform test for reasons depending on outer environment, or certain application logic conditions or configurations. The test code is still executed.<pre class="listing"><span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">isGLContextCreated</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
   <span class="Identifier">skip</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L792" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L792" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1000" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1000" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
 
 </div>
 <div id="suite-templates-all">
-  <div id="suite.t,,">
-  <dt><pre><span class="Keyword">template</span> <a href="#suite.t%2C%2C"><span class="Identifier">suite</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">,</span> <span class="Identifier">body</span><span class="Other">)</span> {.<span class="Identifier">dirty</span>.}</pre></dt>
+  <div id="suite.t,string,untyped">
+  <dt><pre><span class="Keyword">template</span> <a href="#suite.t%2Cstring%2Cuntyped"><span class="Identifier">suite</span></a><span class="Other">(</span><span class="Identifier">nameParam</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span> {.<span class="Identifier">dirty</span>.}</pre></dt>
   <dd>
     
     <p>Declare a test suite identified by <tt class="docutils literal"><span class="pre"><span class="Identifier">name</span></span></tt> with optional <tt class="docutils literal"><span class="pre">setup</span></tt> and/or <tt class="docutils literal"><span class="pre">teardown</span></tt> section.</p>
@@ -893,8 +881,8 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 <pre class="listing"><span class="Punctuation">[</span><span class="Identifier">Suite</span><span class="Punctuation">]</span> <span class="Identifier">test</span> <span class="Identifier">suite</span> <span class="Keyword">for</span> <span class="Identifier">addition</span>
   <span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="DecNumber">2</span> <span class="Operator">+</span> <span class="DecNumber">2</span> <span class="Operator">=</span> <span class="DecNumber">4</span>
   <span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="Punctuation">(</span><span class="DecNumber">2</span> <span class="Operator">+</span> <span class="Operator">-</span><span class="DecNumber">2</span><span class="Punctuation">)</span> <span class="Operator">!=</span> <span class="DecNumber">4</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L686" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L686" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L896" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L896" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -902,15 +890,15 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
 </div>
 <div id="test-templates-all">
   <div id="test.t,string,untyped">
-  <dt><pre><span class="Keyword">template</span> <a href="#test.t%2Cstring%2Cuntyped"><span class="Identifier">test</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
+  <dt><pre><span class="Keyword">template</span> <a href="#test.t%2Cstring%2Cuntyped"><span class="Identifier">test</span></a><span class="Other">(</span><span class="Identifier">nameParam</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
   <dd>
     
     Define a single test case identified by <tt class="docutils literal"><span class="pre"><span class="Identifier">name</span></span></tt>.<pre class="listing"><span class="Identifier">test</span> <span class="StringLit">&quot;roses are red&quot;</span><span class="Punctuation">:</span>
   <span class="Keyword">let</span> <span class="Identifier">roses</span> <span class="Operator">=</span> <span class="StringLit">&quot;red&quot;</span>
   <span class="Identifier">check</span><span class="Punctuation">(</span><span class="Identifier">roses</span> <span class="Operator">==</span> <span class="StringLit">&quot;red&quot;</span><span class="Punctuation">)</span></pre><p>The above code outputs:</p>
 <pre class="listing"><span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="Identifier">roses</span> <span class="Identifier">are</span> <span class="Identifier">red</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L808" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L808" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1036" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1036" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -926,7 +914,7 @@ NIMTEST_PARALLEL=1 nim c -r --threads:on testfile.nim</pre><p>There are some imp
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2023-08-22 15:42:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2023-09-01 10:32:45 UTC</small>
       </div>
     </div>
   </div>
