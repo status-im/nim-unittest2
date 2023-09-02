@@ -264,9 +264,11 @@ var
   formatters {.threadvar.}: seq[OutputFormatter]
   testsFilters {.threadvar.}: HashSet[string]
 
+  currentSuite {.threadvar.}: string
+
 when collect:
   var
-    tests: OrderedTable[string, seq[Test]]
+    tests {.threadvar.}: OrderedTable[string, seq[Test]]
 
 abortOnError = nimUnittestAbortOnError
 
@@ -330,6 +332,11 @@ when collect:
       formatter.suiteRunEnded()
 
 proc testRunEnded() =
+  when not collect:
+    if currentSuite.len > 0:
+      suiteEnded()
+      currentSuite.reset()
+
   for formatter in formatters:
     testRunEnded(formatter)
 
@@ -446,6 +453,7 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
     stdout.styledWrite(styleBright, fgBlue, counter, alignLeft(suiteName, maxNameLen), eol)
   do:
     stdout.write(counter, alignLeft(suiteName, maxNameLen), eol)
+  stdout.flushFile()
 
 proc writeTestName(formatter: ConsoleOutputFormatter, testName: string) =
   formatter.write do:
@@ -922,7 +930,7 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind collect, suiteStarted, suiteEnded
+  bind collect, currentSuite, suiteStarted, suiteEnded
 
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
@@ -940,6 +948,12 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
     let suiteName {.inject.} = nameParam
 
     when not collect:
+      # TODO deal with suite nesting
+      if currentSuite.len > 0:
+        suiteEnded()
+        currentSuite.reset()
+      currentSuite = suiteName
+
       suiteStarted(suiteName)
 
     # TODO what about exceptions in the suite itself?
@@ -950,6 +964,7 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
 
     when not collect:
       suiteEnded()
+      currentSuite.reset()
 
 template checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
@@ -1014,6 +1029,16 @@ template skip* =
   checkpoints = @[]
 
 proc runDirect(test: Test) =
+  when not collect:
+    # In collection mode, we implicitly create a suite based on the module name
+    # and start it based on the test list but in non-collect mode, we have to
+    # emulate this with this hack
+    if currentSuite != test.suiteName:
+      if currentSuite.len > 0:
+        suiteEnded()
+      suiteStarted(test.suiteName)
+      currentSuite = test.suiteName
+
   let startTime = getMonoTime()
   testStarted(test.testName)
 
