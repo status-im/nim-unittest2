@@ -488,9 +488,9 @@ method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
   echo ""
 
 method failureOccurred*(formatter: ConsoleOutputFormatter,
-                        checkpoints: seq[string], stackTrace: string) =
+                        checkpoints: seq[string], stackTraces: seq[string]) =
 
-  for msg in items(checkpoints):
+  for i, msg in checkpoints:
     formatter.errors.add("    ")
     formatter.errors.add(msg)
     formatter.errors.add("\n")
@@ -745,7 +745,7 @@ proc writeTest(s: Stream, test: JUnitTest) {.raises: [CatchableError].} =
   of TestStatus.FAILED:
     if test.error.checkpoints.len > 0:
       s.writeLine("\t\t\t<error message=\"$#\">$#</error>" % [
-          xmlEscape(join(test.error.checkpoints, "\n")), xmlEscape(join(test.error.stacktraces))])
+          xmlEscape(join(test.error.checkpoints, "\n")), xmlEscape(join(test.error.stackTraces))])
 
     for failure in test.failures:
       s.writeLine("\t\t\t<failure message=\"$#\">$#</failure>" %
@@ -1002,12 +1002,12 @@ template fail* =
   for formatter in formatters:
     let formatter = formatter # avoid lent iterator
     when declared(stackTraces):
-      when stackTrace is string:
+      when stackTraces is string:
         formatter.failureOccurred(checkpoints, stackTraces)
       else:
         formatter.failureOccurred(checkpoints, newSeq[string]())
     else:
-      formatter.failureOccurred(checkpoints, "")
+      formatter.failureOccurred(checkpoints, newSeq[string]())
 
   if abortOnError: quit(1)
 
@@ -1100,15 +1100,14 @@ template test*(nameParam: string, body: untyped) =
     except CatchableError as e:
       let eTypeDesc = "[" & $e.name & "]"
       checkpoint("Unhandled error: " & e.msg & " " & eTypeDesc)
-      let eTypeDesc = "[" & exceptionTypeName(e) & "]"
-        checkpoint("Unhandled exception: " & e.msg & " " & eTypeDesc)
-        var stackTraces {.inject.} = newSeq[string]()
-        stackTraces.add(e.getStackTrace())
 
-        if e.parent != nil:
-          let eParentTypeDesc = "[" & exceptionTypeName(e.parent) & "]"
-          stackTraces.add(e.parent.getStackTrace())
-          checkpoint("Unhandled exception: " & e.parent.msg & " " & eParentTypeDesc)
+      var stackTraces {.inject.} = newSeq[string]()
+      stackTraces.add(e.getStackTrace())
+
+      if e.parent != nil:
+        let eParentTypeDesc = "[" & $e.parent.name & "]"
+        stackTraces.add(e.parent.getStackTrace())
+        checkpoint("Unhandled exception: " & e.parent.msg & " " & eParentTypeDesc)
       fail()
 
     except Defect as e: # This may or may not work dependings on --panics
