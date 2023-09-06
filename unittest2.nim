@@ -228,6 +228,8 @@ type
 
     statuses: array[TestStatus, int]
 
+    totalDuration: Duration
+
     results: seq[TestResult]
 
     failures: seq[TestResult]
@@ -560,6 +562,7 @@ proc printTestResultStatus(formatter: ConsoleOutputFormatter, testResult: TestRe
 
 method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   formatter.statuses[testResult.status] += 1
+  formatter.totalDuration += testResult.duration
 
   if formatter.outputLevel == NONE:
     return
@@ -643,9 +646,11 @@ method testRunEnded*(formatter: ConsoleOutputFormatter) =
         formatter.statuses[TestStatus.FAILED] > 0):
     return
 
+  let totalDurStr = formatDuration(formatter.totalDuration, false)
+
   try:
     let total = foldl(formatter.statuses, a + b, 0)
-    stdout.write("[Summary ] ", $total, " tests run: ")
+    stdout.write("[Summary] ", $total, " tests run ", totalDurStr, ": ")
 
     var first = true
     for s, c in formatter.statuses:
