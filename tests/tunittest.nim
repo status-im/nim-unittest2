@@ -65,50 +65,50 @@ runtimeTest "unittest expect":
   expect Defect, CatchableError:
     if true: raise Defect.newException("Okay")
 
-  var
-    a = 1
+var
+  a = 1
+  b = -1
+  c = 1
+
+#unittests are sequential right now
+suite "suite with only teardown":
+  teardown:
+    b = 2
+
+  runtimeTest "unittest with only teardown 1":
+    check a == c
+
+  runtimeTest "unittest with only teardown 2":
+    check b > a
+
+suite "suite with only setup":
+  setup:
+    var testVar {.used.} = "from setup"
+
+  runtimeTest "unittest with only setup 1":
+    check testVar == "from setup"
+    check b > a
     b = -1
-    c = 1
 
-  #unittests are sequential right now
-  suite "suite with only teardown":
-    teardown:
-      b = 2
+  runtimeTest "unittest with only setup 2":
+    check b < a
 
-    runtimeTest "unittest with only teardown 1":
-      check a == c
+suite "suite with none":
+  runtimeTest "unittest with none":
+    check b < a
 
-    runtimeTest "unittest with only teardown 2":
-      check b > a
+suite "suite with both":
+  setup:
+    a = -2
 
-  suite "suite with only setup":
-    setup:
-      var testVar {.used.} = "from setup"
+  teardown:
+    c = 2
 
-    runtimeTest "unittest with only setup 1":
-      check testVar == "from setup"
-      check b > a
-      b = -1
+  runtimeTest "unittest with both 1":
+    check b > a
 
-    runtimeTest "unittest with only setup 2":
-      check b < a
-
-  suite "suite with none":
-    runtimeTest "unittest with none":
-      check b < a
-
-  suite "suite with both":
-    setup:
-      a = -2
-
-    teardown:
-      c = 2
-
-    runtimeTest "unittest with both 1":
-      check b > a
-
-    runtimeTest "unittest with both 2":
-      check c == 2
+  runtimeTest "unittest with both 2":
+    check c == 2
 
 suite "bug #4494":
     test "Uniqueness check":
