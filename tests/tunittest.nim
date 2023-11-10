@@ -41,11 +41,9 @@ test "unittest typedescs":
   check(none(int) == none(int))
   check(none(int) != some(1))
 
-
 test "unittest multiple requires":
   require(true)
   require(true)
-
 
 import random
 proc defectiveRobot() =
@@ -55,7 +53,7 @@ proc defectiveRobot() =
   of 2: discard parseInt("Hello World!")
   of 3: raise newException(IOError, "I can't do that Dave.")
   else: assert 2 + 2 == 5
-test "unittest expect":
+runtimeTest "unittest expect":
   expect IOError, OSError, ValueError, AssertionDefect:
     defectiveRobot()
   expect CatchableError:
@@ -77,26 +75,26 @@ suite "suite with only teardown":
   teardown:
     b = 2
 
-  test "unittest with only teardown 1":
+  runtimeTest "unittest with only teardown 1":
     check a == c
 
-  test "unittest with only teardown 2":
+  runtimeTest "unittest with only teardown 2":
     check b > a
 
 suite "suite with only setup":
   setup:
     var testVar {.used.} = "from setup"
 
-  test "unittest with only setup 1":
+  runtimeTest "unittest with only setup 1":
     check testVar == "from setup"
     check b > a
     b = -1
 
-  test "unittest with only setup 2":
+  runtimeTest "unittest with only setup 2":
     check b < a
 
 suite "suite with none":
-  test "unittest with none":
+  runtimeTest "unittest with none":
     check b < a
 
 suite "suite with both":
@@ -106,10 +104,10 @@ suite "suite with both":
   teardown:
     c = 2
 
-  test "unittest with both 1":
+  runtimeTest "unittest with both 1":
     check b > a
 
-  test "unittest with both 2":
+  runtimeTest "unittest with both 2":
     check c == 2
 
 suite "bug #4494":
@@ -187,4 +185,3 @@ when defined(testing):
 
 # Also supposed to work outside tests:
 check 1 == 1
-

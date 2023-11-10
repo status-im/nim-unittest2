@@ -1,6 +1,5 @@
+# unittest2
 #
-#
-#            Nim's Runtime Library
 #        (c) Copyright 2015 Nim Contributors
 #        (c) Copyright 2019-2021 Ștefan Talpalaru
 #        (c) Copyright 2021-Onwards Status Research and Development
@@ -156,6 +155,11 @@ const
   unittest2PreviewIsolate {.booldefine.} = false
     ## Preview isolation mode where each test is run in a separate process - may
     ## be removed in the future
+  unittest2Static* {.booldefine.} = false
+    ## Run tests at compile time as well - only a subset of functionality is
+    ## enabled at compile-time meaning that tests must be written
+    ## conservatively. `suite` features (`setup` etc) in particular are not
+    ## supported.
 
 when useTerminal:
   import std/terminal
@@ -406,6 +410,23 @@ const
   maxStatusLen = 7
   maxDurationLen = 6
 
+func formatStatus(status: string): string =
+  "[" & alignLeft(status, maxStatusLen) & "]"
+
+func formatStatus(status: TestStatus): string =
+  formatStatus($status)
+
+proc formatDuration(dur: Duration, aligned = true): string =
+  let
+    seconds = dur.inMilliseconds.float / 1000.0
+    precision = max(3 - ($seconds.int).len, 1)
+    str = formatFloat(seconds, ffDecimal, precision)
+
+  if aligned:
+    "(" & align(str, maxDurationLen) & "s)"
+  else:
+    "(" & str & "s)"
+
 when collect:
   proc formatFraction(cur, total: int): string =
     let
@@ -448,7 +469,7 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
     counter =
       when collect: formatFraction(formatter.curSuite, formatter.tests.len) & " "
       else:
-        if formatter.outputLevel == VERBOSE: "[Suite  ] " else: ""
+        if formatter.outputLevel == VERBOSE: formatStatus("Suite") & " " else: ""
     maxNameLen = when collect: max(toSeq(formatter.tests.keys()).mapIt(it.len)) else: 0
     eol = if formatter.outputLevel == VERBOSE: "\n" else: " "
   formatter.write do:
@@ -479,7 +500,7 @@ method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
         try: formatFraction(formatter.curTest, formatter.tests[formatter.curSuiteName]) & " "
         except CatchableError: ""
       else:
-        "[Test   ]"
+        formatStatus("Test")
 
   formatter.write do:
     stdout.styledWrite "  ", fgBlue, alignLeft(counter, maxStatusLen + maxDurationLen + 7)
@@ -509,20 +530,6 @@ proc marker(status: TestStatus): string =
   of TestStatus.OK: "."
   of TestStatus.FAILED: "F"
   of TestStatus.SKIPPED: "s"
-
-proc formatDuration(dur: Duration, aligned = true): string =
-  let
-    seconds = dur.inMilliseconds.float / 1000.0
-    precision = max(3 - ($seconds.int).len, 1)
-    str = formatFloat(seconds, ffDecimal, precision)
-
-  if aligned:
-    "(" & align(str, maxDurationLen) & "s)"
-  else:
-    "(" & str & "s)"
-
-proc formatStatus(status: TestStatus): string =
-  "[" & alignLeft($status, maxStatusLen) & "]"
 
 proc getAppFilename2(): string =
   # TODO https://github.com/nim-lang/Nim/pull/22544
@@ -850,14 +857,17 @@ when defined(testing): export matchFilter
 proc shouldRun(currentSuiteName, testName: string): bool =
   ## Check if a test should be run by matching suiteName and testName against
   ## test filters.
-  if testsFilters.len == 0:
-    return true
-
-  for f in testsFilters:
-    if matchFilter(currentSuiteName, testName, f):
+  when nimvm:
+    true
+  else:
+    if testsFilters.len == 0:
       return true
 
-  return false
+    for f in testsFilters:
+      if matchFilter(currentSuiteName, testName, f):
+        return true
+
+    return false
 
 proc parseParameters*(args: openArray[string]) =
   var
@@ -950,16 +960,18 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
       var testSuiteTeardownIMPLFlag {.used.} = true
       template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
 
-    let suiteName {.inject.} = nameParam
+    when nimvm:
+      discard
+    else:
+      let suiteName {.inject.} = nameParam
+      when not collect:
+        # TODO deal with suite nesting
+        if currentSuite.len > 0:
+          suiteEnded()
+          currentSuite.reset()
+        currentSuite = suiteName
 
-    when not collect:
-      # TODO deal with suite nesting
-      if currentSuite.len > 0:
-        suiteEnded()
-        currentSuite.reset()
-      currentSuite = suiteName
-
-      suiteStarted(suiteName)
+        suiteStarted(suiteName)
 
     # TODO what about exceptions in the suite itself?
     body
@@ -967,9 +979,12 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
     when declared(testSuiteTeardownIMPLFlag):
       testSuiteTeardownIMPL()
 
-    when not collect:
-      suiteEnded()
-      currentSuite.reset()
+    when nimvm:
+      discard
+    else:
+      when not collect:
+        suiteEnded()
+        currentSuite.reset()
 
 template checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
@@ -982,8 +997,16 @@ template checkpoint*(msg: string) =
   ##  checkpoint("Checkpoint B")
   ##
   ## outputs "Checkpoint A" once it fails.
-  checkpoints.add(msg)
-  # TODO: add support for something like SCOPED_TRACE from Google Test
+  when nimvm:
+    when compiles(testName):
+      echo testName
+
+    echo msg
+  else:
+    bind checkpoints
+
+    checkpoints.add(msg)
+    # TODO: add support for something like SCOPED_TRACE from Google Test
 
 template fail* =
   ## Print out the checkpoints encountered so far and quit if ``abortOnError``
@@ -998,24 +1021,28 @@ template fail* =
   ##  fail()
   ##
   ## outputs "Checkpoint A" before quitting.
-  when declared(testStatusIMPL):
-    testStatusIMPL = TestStatus.FAILED
+  when nimvm:
+    echo "Tests failed"
+    quit 1
+  else:
+    when declared(testStatusIMPL):
+      testStatusIMPL = TestStatus.FAILED
 
-  programResult = 1
+    programResult = 1
 
-  for formatter in formatters:
-    let formatter = formatter # avoid lent iterator
-    when declared(stackTrace):
-      when stackTrace is string:
-        formatter.failureOccurred(checkpoints, stackTrace)
+    for formatter in formatters:
+      let formatter = formatter # avoid lent iterator
+      when declared(stackTrace):
+        when stackTrace is string:
+          formatter.failureOccurred(checkpoints, stackTrace)
+        else:
+          formatter.failureOccurred(checkpoints, "")
       else:
         formatter.failureOccurred(checkpoints, "")
-    else:
-      formatter.failureOccurred(checkpoints, "")
 
-  if abortOnError: quit(1)
+    if abortOnError: quit(1)
 
-  checkpoints.reset()
+    checkpoints.reset()
 
 template skip* =
   ## Mark the test as skipped. Should be used directly
@@ -1028,10 +1055,13 @@ template skip* =
   ##
   ##  if not isGLContextCreated():
   ##    skip()
-  bind checkpoints
+  when nimvm:
+    discard
+  else:
+    bind checkpoints
 
-  testStatusIMPL = TestStatus.SKIPPED
-  checkpoints = @[]
+    testStatusIMPL = TestStatus.SKIPPED
+    checkpoints = @[]
 
 proc runDirect(test: Test) =
   when not collect:
@@ -1063,23 +1093,12 @@ proc runDirect(test: Test) =
     duration: duration
   ))
 
-template test*(nameParam: string, body: untyped) =
-  ## Define a single test case identified by `name`.
-  ##
-  ## .. code-block:: nim
-  ##
-  ##  test "roses are red":
-  ##    let roses = "red"
-  ##    check(roses == "red")
-  ##
-  ## The above code outputs:
-  ##
-  ## .. code-block::
-  ##
-  ##  [OK] roses are red
+template runtimeTest*(nameParam: string, body: untyped) =
+  ## Similar to `test` but runs only at run time, no matter the `unittest2Static`
+  ## setting
   bind collect, runDirect, shouldRun, checkpoints
 
-  proc runTest(suiteName, testName: string): TestStatus {.gensym.} =
+  proc runTest(suiteName, testName: string): TestStatus {.raises: [], gensym.} =
     var testStatusIMPL {.inject.} = TestStatus.OK
     let suiteName {.inject, used.} = suiteName
     let testName {.inject, used.} = testName
@@ -1126,6 +1145,37 @@ template test*(nameParam: string, body: untyped) =
       tests.mgetOrPut(localSuiteName, default(seq[Test])).add(instance)
     else:
       runDirect(instance)
+
+
+template staticTest*(nameParam: string, body: untyped) =
+  ## Similar to `test` but runs only at compiletime, no matter the
+  ## `unittest2Static` setting
+  static:
+    block:
+      echo "[Test   ] ", nameParam
+      body
+      echo "[", TestStatus.OK, "     ] ", nameParam
+
+template test*(nameParam: string, body: untyped) =
+  ## Define a single test case identified by `name`.
+  ##
+  ## .. code-block:: nim
+  ##
+  ##  test "roses are red":
+  ##    let roses = "red"
+  ##    check(roses == "red")
+  ##
+  ## The above code outputs:
+  ##
+  ## .. code-block::
+  ##
+  ##  [OK] roses are red
+  when nimvm:
+    when unittest2Static:
+      staticTest nameParam:
+        body
+  runtimeTest nameParam:
+    body
 
 {.pop.} # raises: []
 
@@ -1194,18 +1244,12 @@ macro check*(conditions: untyped): untyped =
             else:
               result.check[i][1] = arg
 
-  let
-    checkpointSym = bindSym("checkpoint")
-    checkSym = bindSym("check")
-    failSym = bindSym("fail")
+  proc buildCheck(lineinfo, callLit, assigns, check, printOuts: NimNode): NimNode =
+    let
+      checkpointSym = bindSym("checkpoint")
+      failSym = bindSym("fail")
 
-  case checked.kind
-  of nnkCallKinds:
-    let (assigns, check, printOuts) = inspectArgs(checked)
-    let lineinfo = newStrLitNode(checked.lineInfo)
-    let callLit = checked.toStrLit
-    let checkpointSym = bindSym("checkpoint")
-    result = nnkBlockStmt.newTree(
+    nnkBlockStmt.newTree(
       newEmptyNode(),
       nnkStmtList.newTree(
         assigns,
@@ -1233,6 +1277,17 @@ macro check*(conditions: untyped): untyped =
       )
     )
 
+  let
+    checkSym = bindSym("check")
+
+  case checked.kind
+  of nnkCallKinds:
+    let
+      (assigns, check, printOuts) = inspectArgs(checked)
+      lineinfo = newStrLitNode(checked.lineInfo)
+      callLit = checked.toStrLit
+    result = buildCheck(lineinfo, callLit, assigns, check, printOuts)
+
   of nnkStmtList:
     result = newNimNode(nnkStmtList)
     for node in checked:
@@ -1240,44 +1295,25 @@ macro check*(conditions: untyped): untyped =
         result.add(newCall(checkSym, node))
 
   else:
-    let lineinfo = newStrLitNode(checked.lineInfo)
-    let callLit = checked.toStrLit
+    let
+      lineinfo = newStrLitNode(checked.lineInfo)
+      callLit = checked.toStrLit
 
-    result = nnkBlockStmt.newTree(
-      newEmptyNode(),
-      nnkStmtList.newTree(
-        nnkIfStmt.newTree(
-          nnkElifBranch.newTree(
-            nnkCall.newTree(ident("not"), checked),
-            nnkStmtList.newTree(
-              nnkCall.newTree(
-                checkpointSym,
-                nnkInfix.newTree(
-                  ident("&"),
-                  nnkInfix.newTree(
-                    ident("&"),
-                    lineinfo,
-                    newLit(": Check failed: ")
-                  ),
-                  callLit
-                )
-              ),
-              nnkCall.newTree(failSym)
-            )
-          )
-        )
-      )
-    )
+    result = buildCheck(
+      lineinfo, callLit, newEmptyNode(), checked, newEmptyNode())
 
 template require*(conditions: untyped) =
   ## Same as `check` except any failed test causes the program to quit
   ## immediately. Any teardown statements are not executed and the failed
   ## test output is not generated.
-  let savedAbortOnError = abortOnError
-  block:
-    abortOnError = true
+  when nimvm:
     check conditions
-  abortOnError = savedAbortOnError
+  else:
+    let savedAbortOnError = abortOnError
+    block:
+      abortOnError = true
+      check conditions
+    abortOnError = savedAbortOnError
 
 macro expect*(exceptions: varargs[typed], body: untyped): untyped =
   ## Test if `body` raises an exception found in the passed `exceptions`.

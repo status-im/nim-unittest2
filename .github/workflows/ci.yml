@@ -156,16 +156,10 @@ jobs:
       - name: Run tests
         run: |
           nim --version
-          env TEST_LANG="c" NIMFLAGS="${NIMFLAGS} --gc:refc" nim test
-          env TEST_LANG="cpp" NIMFLAGS="${NIMFLAGS} --gc:refc" nim test
-          if [[ "${{ matrix.branch }}" == "devel" ]]; then
-            echo -e "\nTesting with '--gc:orc':\n"
-            if env TEST_LANG="c" NIMFLAGS="${NIMFLAGS} --gc:orc" nim test; then
-              echo "Nim devel with --gc:orc works again! Please remove this check in ci.yml"
-              false
-            fi
-            if env TEST_LANG="cpp" NIMFLAGS="${NIMFLAGS} --gc:orc" nim test; then
-              echo "Nim devel with --gc:orc works again! Please remove this check in ci.yml"
-              false
-            fi
+          env TEST_LANG="c" NIMFLAGS="${NIMFLAGS}" nim test
+          env TEST_LANG="cpp" NIMFLAGS="${NIMFLAGS}" nim test
+          if [[ "${{ matrix.branch }}" != "version-1-6" ]]; then
+            echo -e "\nTesting with '--mm:refc':\n"
+            TEST_LANG="c" NIMFLAGS="${NIMFLAGS} --mm:refc" nim test
+            TEST_LANG="cpp" NIMFLAGS="${NIMFLAGS} --mm:refc" nim test
           fi
