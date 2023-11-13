@@ -1149,12 +1149,20 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
 template staticTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but runs only at compiletime, no matter the
-  ## `unittest2Static` setting
+  ## `unittest2Static` flag
   static:
     block:
       echo "[Test   ] ", nameParam
       body
       echo "[", TestStatus.OK, "     ] ", nameParam
+
+template dualTest*(nameParam: string, body: untyped) =
+  ## Similar to `test` but run the test both compuletime and run time, no
+  ## matter the `unittest2Static` flag
+  staticTest nameParam:
+    body
+  runtimeTest nameParam:
+    body
 
 template test*(nameParam: string, body: untyped) =
   ## Define a single test case identified by `name`.
