@@ -222,6 +222,10 @@
   <li><a class="reference" href="#checkpoint.t%2Cstring" title="checkpoint(msg: string)">checkpoint(msg: string)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">dualTest
+  <li><a class="reference" href="#dualTest.t%2Cstring%2Cuntyped" title="dualTest(nameParam: string; body: untyped)">dualTest(nameParam: string; body: untyped)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">fail
   <li><a class="reference" href="#fail.t" title="fail()">fail()</a></li>
 
@@ -486,8 +490,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 </div>
 
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1358" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1358" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1366" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1366" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -796,8 +800,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 <span class="Identifier">check</span><span class="Punctuation">:</span>
   <span class="StringLit">&quot;AKB48&quot;</span><span class="Operator">.</span><span class="Identifier">toLowerAscii</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">==</span> <span class="StringLit">&quot;akb48&quot;</span>
   <span class="CharLit">'C'</span> <span class="Keyword">notin</span> <span class="Identifier">teams</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1182" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1182" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1190" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1190" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -821,8 +825,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 
 <span class="Identifier">expect</span> <span class="Identifier">IOError</span><span class="Punctuation">,</span> <span class="Identifier">OSError</span><span class="Punctuation">,</span> <span class="Identifier">ValueError</span><span class="Punctuation">,</span> <span class="Identifier">AssertionDefect</span><span class="Punctuation">:</span>
   <span class="Identifier">defectiveRobot</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1318" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1318" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1326" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1326" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -850,6 +854,19 @@ nim c -r test 'bug #*::' '::#*'</pre>
 </div>
 
 </div>
+<div id="dualTest-templates-all">
+  <div id="dualTest.t,string,untyped">
+  <dt><pre><span class="Keyword">template</span> <a href="#dualTest.t%2Cstring%2Cuntyped"><span class="Identifier">dualTest</span></a><span class="Other">(</span><span class="Identifier">nameParam</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    Similar to <tt class="docutils literal"><span class="pre"><span class="Identifier">test</span></span></tt> but run the test both compuletime and run time, no matter the <tt class="docutils literal"><span class="pre"><span class="Identifier">unittest2Static</span></span></tt> flag
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1159" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1159" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+
+  </dd>
+</div>
+
+</div>
 <div id="fail-templates-all">
   <div id="fail.t">
   <dt><pre><span class="Keyword">template</span> <a href="#fail.t"><span class="Identifier">fail</span></a><span class="Other">(</span><span class="Other">)</span></pre></dt>
@@ -872,8 +889,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Same as <tt class="docutils literal"><span class="pre"><span class="Identifier">check</span></span></tt> except any failed test causes the program to quit immediately. Any teardown statements are not executed and the failed test output is not generated.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1305" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1305" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1313" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1313" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -911,7 +928,7 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dt><pre><span class="Keyword">template</span> <a href="#staticTest.t%2Cstring%2Cuntyped"><span class="Identifier">staticTest</span></a><span class="Other">(</span><span class="Identifier">nameParam</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
   <dd>
     
-    Similar to <tt class="docutils literal"><span class="pre"><span class="Identifier">test</span></span></tt> but runs only at compiletime, no matter the <tt class="docutils literal"><span class="pre"><span class="Identifier">unittest2Static</span></span></tt> setting
+    Similar to <tt class="docutils literal"><span class="pre"><span class="Identifier">test</span></span></tt> but runs only at compiletime, no matter the <tt class="docutils literal"><span class="pre"><span class="Identifier">unittest2Static</span></span></tt> flag
     <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1150" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
 <a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1150" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
@@ -956,8 +973,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <span class="Keyword">let</span> <span class="Identifier">roses</span> <span class="Operator">=</span> <span class="StringLit">&quot;red&quot;</span>
   <span class="Identifier">check</span><span class="Punctuation">(</span><span class="Identifier">roses</span> <span class="Operator">==</span> <span class="StringLit">&quot;red&quot;</span><span class="Punctuation">)</span></pre><p>The above code outputs:</p>
 <pre class="listing"><span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="Identifier">roses</span> <span class="Identifier">are</span> <span class="Identifier">red</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1159" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1159" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1167" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1167" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -973,7 +990,7 @@ nim c -r test 'bug #*::' '::#*'</pre>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2023-11-10 12:50:12 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2023-11-13 07:44:32 UTC</small>
       </div>
     </div>
   </div>
