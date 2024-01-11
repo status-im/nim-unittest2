@@ -1128,7 +1128,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
       try:
         when declared(testTeardownIMPLFlag):
           testTeardownIMPL()
-      except CatchableError:
+      except CatchableError, Defect, Exception:
         checkpoint("Exception when calling testTeardownIMPL: " & getCurrentExceptionMsg())
         fail()
 
