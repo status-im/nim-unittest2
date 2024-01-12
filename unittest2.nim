@@ -1105,8 +1105,6 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
     try:
       when declared(testSetupIMPLFlag): testSetupIMPL()
-      when declared(testTeardownIMPLFlag):
-        defer: testTeardownIMPL()
       block:
         body
 
@@ -1126,6 +1124,15 @@ template runtimeTest*(nameParam: string, body: untyped) =
       checkpoint("Unhandled exception that may cause undefined behavior: " & e.msg & " " & eTypeDesc)
       var stackTrace {.inject.} = e.getStackTrace()
       fail()
+    finally:
+      try:
+        when declared(testTeardownIMPLFlag):
+          testTeardownIMPL()
+      except Exception as e:
+        let eTypeDesc = "[" & $e.name & "]"
+        checkpoint("Exception when calling teardown: " & e.msg & " " & eTypeDesc)
+        var stackTrace {.inject.} = e.getStackTrace()
+        fail()
 
     checkpoints = @[]
 
