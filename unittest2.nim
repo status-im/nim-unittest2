@@ -1128,8 +1128,10 @@ template runtimeTest*(nameParam: string, body: untyped) =
       try:
         when declared(testTeardownIMPLFlag):
           testTeardownIMPL()
-      except CatchableError, Defect, Exception:
-        checkpoint("Exception when calling testTeardownIMPL: " & getCurrentExceptionMsg())
+      except Exception as e:
+        let eTypeDesc = "[" & $e.name & "]"
+        checkpoint("Exception when calling teardown: " & e.msg & " " & eTypeDesc)
+        var stackTrace {.inject.} = e.getStackTrace()
         fail()
 
     checkpoints = @[]
