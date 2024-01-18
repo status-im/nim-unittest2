@@ -1109,9 +1109,9 @@ template runtimeTest*(nameParam: string, body: untyped) =
       var stackTrace {.inject.} = e.getStackTrace()
       fail()
 
-    template failingOnExceptions(prefix: string, body: untyped): untyped =
+    template failingOnExceptions(prefix: string, code: untyped): untyped =
       try:
-        body
+        code
       except CatchableError as e:
         prefix.fail("error", e)
       except Defect as e: # This may or may not work dependings on --panics
