@@ -28,23 +28,24 @@ from std/exitprocs import nil
 # This kind of tests should be executed first
 #------------------------------------------------------------------------------
 
-suite "PR #35":  
+suite "PR #35":
   setup:
     # ensure teardown is called at the end
     doAssert(true)
-    
-  teardown:    
+
+  teardown:
     if testStatusIMPL != TestStatus.FAILED:
       testStatusIMPL = TestStatus.FAILED
+      exitProcs.setProgramResult(QuitFailure)
+      debugEcho "PR #35 test FAILED"
     else:
       testStatusIMPL = TestStatus.OK
-    if exitprocs.getProgramResult() == 1:
-      exitProcs.setProgramResult(0)
+      exitProcs.setProgramResult(QuitSuccess)
 
   test "something":
     # emulate exception
     raise newException(ValueError, "error")
-    
+
 #------------------------------------------------------------------------------
 # Regular tests
 #------------------------------------------------------------------------------
