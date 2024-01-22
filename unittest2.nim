@@ -1111,7 +1111,8 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
     template failingOnExceptions(prefix: string, code: untyped): untyped =
       try:
-        code
+        block:
+          code
       except CatchableError as e:
         prefix.fail("error", e)
       except Defect as e: # This may or may not work dependings on --panics
