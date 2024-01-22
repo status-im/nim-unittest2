@@ -20,7 +20,34 @@ discard """
 '''
 """
 
-import unittest2, sequtils
+import ../unittest2, sequtils
+from std/exitprocs import nil
+
+#------------------------------------------------------------------------------
+# Tests using backdoors
+# This kind of tests should be executed first
+#------------------------------------------------------------------------------
+
+suite "PR #35":  
+  setup:
+    # ensure teardown is called at the end
+    doAssert(true)
+    
+  teardown:    
+    if testStatusIMPL != TestStatus.FAILED:
+      testStatusIMPL = TestStatus.FAILED
+    else:
+      testStatusIMPL = TestStatus.OK
+    if exitprocs.getProgramResult() == 1:
+      exitProcs.setProgramResult(0)
+
+  test "something":
+    # emulate exception
+    raise newException(ValueError, "error")
+    
+#------------------------------------------------------------------------------
+# Regular tests
+#------------------------------------------------------------------------------
 
 proc doThings(spuds: var int): int =
   spuds = 24
