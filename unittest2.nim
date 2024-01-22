@@ -1103,36 +1103,28 @@ template runtimeTest*(nameParam: string, body: untyped) =
     let suiteName {.inject, used.} = suiteName
     let testName {.inject, used.} = testName
 
-    try:
-      when declared(testSetupIMPLFlag): testSetupIMPL()
-      block:
-        body
-
-    except CatchableError as e:
-      let eTypeDesc = "[" & $e.name & "]"
-      checkpoint("Unhandled error: " & e.msg & " " & eTypeDesc)
+    template fail(prefix: string, eClass: string, e: auto): untyped =
+      let eName = "[" & $e.name & "]"
+      checkpoint(prefix & "Unhandled " & eClass & ": " & e.msg & " " & eName)
       var stackTrace {.inject.} = e.getStackTrace()
       fail()
 
-    except Defect as e: # This may or may not work dependings on --panics
-      let eTypeDesc = "[" & $e.name & "]"
-      checkpoint("Unhandled defect: " & e.msg & " " & eTypeDesc)
-      var stackTrace {.inject.} = e.getStackTrace()
-      fail()
-    except Exception as e:
-      let eTypeDesc = "[" & $e.name & "]"
-      checkpoint("Unhandled exception that may cause undefined behavior: " & e.msg & " " & eTypeDesc)
-      var stackTrace {.inject.} = e.getStackTrace()
-      fail()
-    finally:
+    template failingOnExceptions(prefix: string, code: untyped): untyped =
       try:
-        when declared(testTeardownIMPLFlag):
-          testTeardownIMPL()
+        code
+      except CatchableError as e:
+        prefix.fail("error", e)
+      except Defect as e: # This may or may not work dependings on --panics
+        prefix.fail("defect", e)
       except Exception as e:
-        let eTypeDesc = "[" & $e.name & "]"
-        checkpoint("Exception when calling teardown: " & e.msg & " " & eTypeDesc)
-        var stackTrace {.inject.} = e.getStackTrace()
-        fail()
+        prefix.fail("exception that may cause undefined behavior", e)
+
+    failingOnExceptions("[setup] "):
+      when declared(testSetupIMPLFlag): testSetupIMPL()
+      defer: failingOnExceptions("[teardown] "):
+        when declared(testTeardownIMPLFlag): testTeardownIMPL()
+      failingOnExceptions(""):
+        body
 
     checkpoints = @[]
 
