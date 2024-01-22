@@ -46,6 +46,20 @@ suite "PR #35":
     # emulate exception
     raise newException(ValueError, "error")
 
+suite "PR #36":
+  # ensure variables declared in setup section
+  # still accessible from teardown section
+  setup:
+    var server: ref string
+
+  teardown:
+    if server.isNil.not:
+      testStatusIMPL = TestStatus.OK
+
+  test "test body":
+    server = new(string)
+    server[] = "hello"
+    
 #------------------------------------------------------------------------------
 # Regular tests
 #------------------------------------------------------------------------------
@@ -213,3 +227,4 @@ when defined(testing):
 
 # Also supposed to work outside tests:
 check 1 == 1
+      
