@@ -1111,7 +1111,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
     template failingOnExceptions(prefix: string, code: untyped): untyped =
       when NimMajor>=2:
-        {.warning[UnnamedBreak]:off.}
+        {.push warning[UnnamedBreak]:off.}
       try:
         block:
           code
@@ -1122,7 +1122,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
       except Exception as e:
         prefix.fail("exception that may cause undefined behavior", e)
       when NimMajor>=2:
-        {.warning[UnnamedBreak]:on.}
+        {.pop.}
 
     failingOnExceptions("[setup] "):
       when declared(testSetupIMPLFlag): testSetupIMPL()
