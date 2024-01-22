@@ -1028,7 +1028,7 @@ template fail* =
     when declared(testStatusIMPL):
       testStatusIMPL = TestStatus.FAILED
 
-    programResult = 1
+    exitProcs.setProgramResult(1)
 
     for formatter in formatters:
       let formatter = formatter # avoid lent iterator
