@@ -1110,14 +1110,19 @@ template runtimeTest*(nameParam: string, body: untyped) =
       fail()
 
     template failingOnExceptions(prefix: string, code: untyped): untyped =
+      when NimMajor>=2:
+        {.push warning[UnnamedBreak]:off.}
       try:
-        code
+        block:
+          code
       except CatchableError as e:
         prefix.fail("error", e)
       except Defect as e: # This may or may not work dependings on --panics
         prefix.fail("defect", e)
       except Exception as e:
         prefix.fail("exception that may cause undefined behavior", e)
+      when NimMajor>=2:
+        {.pop.}
 
     failingOnExceptions("[setup] "):
       when declared(testSetupIMPLFlag): testSetupIMPL()
@@ -1144,7 +1149,6 @@ template runtimeTest*(nameParam: string, body: untyped) =
       tests.mgetOrPut(localSuiteName, default(seq[Test])).add(instance)
     else:
       runDirect(instance)
-
 
 template staticTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but runs only at compiletime, no matter the

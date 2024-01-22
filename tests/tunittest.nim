@@ -59,7 +59,7 @@ suite "PR #36":
   test "test body":
     server = new(string)
     server[] = "hello"
-    
+
 #------------------------------------------------------------------------------
 # Regular tests
 #------------------------------------------------------------------------------
@@ -227,4 +227,14 @@ when defined(testing):
 
 # Also supposed to work outside tests:
 check 1 == 1
-      
+
+suite "break should works inside test body":
+  var number: int = 0
+  test "step one":
+    number = 2
+  test "step two":
+    if number == 2:
+      break
+    number = 3
+  test "step three":
+    check number == 2
