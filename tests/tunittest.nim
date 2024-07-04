@@ -34,12 +34,14 @@ suite "PR #35":
     doAssert(true)
 
   teardown:
-    if testStatusIMPL != TestStatus.FAILED:
+    if testStatusIMPL != TestStatus.FAILED or testStatusObj.status != TestStatus.FAILED:
       testStatusIMPL = TestStatus.FAILED
+      testStatusObj.status = TestStatus.FAILED
       exitProcs.setProgramResult(QuitFailure)
       debugEcho "PR #35 test FAILED"
     else:
       testStatusIMPL = TestStatus.OK
+      testStatusObj.status = TestStatus.OK
       exitProcs.setProgramResult(QuitSuccess)
 
   test "something":
@@ -238,3 +240,18 @@ suite "break should works inside test body":
     number = 3
   test "step three":
     check number == 2
+
+suite "Issue #43":
+  proc p = fail()
+
+  teardown:
+    if testStatusObj.status != TestStatus.FAILED:
+      testStatusObj.status = TestStatus.FAILED
+      exitProcs.setProgramResult(QuitFailure)
+      debugEcho "Issue #43 test FAILED"
+    else:
+      testStatusObj.status = TestStatus.OK
+      exitProcs.setProgramResult(QuitSuccess)
+
+  test "procedure defined outside the test scope fails":
+    p()

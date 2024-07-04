@@ -256,6 +256,10 @@ type
     suites: seq[JUnitSuite]
     currentSuite: int
 
+  TestStatusObject = object
+    enabled: bool
+    status: TestStatus
+
 # TODO these globals are threadvar so as to avoid gc-safety-issues - this should
 #      probably be resolved in a better way down the line specially since we
 #      don't support threads _really_
@@ -271,6 +275,7 @@ var
   testsFilters {.threadvar.}: HashSet[string]
 
   currentSuite {.threadvar.}: string
+  testStatusObj* {.threadvar.}: TestStatusObject
 
 when collect:
   var
@@ -1027,6 +1032,7 @@ template fail* =
   else:
     when declared(testStatusIMPL):
       testStatusIMPL = TestStatus.FAILED
+    testStatusObj.status = TestStatus.FAILED
 
     exitProcs.setProgramResult(1)
 
@@ -1060,7 +1066,9 @@ template skip* =
   else:
     bind checkpoints
 
-    testStatusIMPL = TestStatus.SKIPPED
+    when declared(testStatusIMPL):
+      testStatusIMPL = TestStatus.SKIPPED
+    testStatusObj.status = TestStatus.SKIPPED
     checkpoints = @[]
 
 proc runDirect(test: Test) =
@@ -1124,6 +1132,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
       when NimMajor>=2:
         {.pop.}
 
+    testStatusObj.status = TestStatus.OK
     failingOnExceptions("[setup] "):
       when declared(testSetupIMPLFlag): testSetupIMPL()
       defer: failingOnExceptions("[teardown] "):
@@ -1132,8 +1141,10 @@ template runtimeTest*(nameParam: string, body: untyped) =
         body
 
     checkpoints = @[]
-
-    testStatusIMPL
+    if testStatusObj.enabled:
+      testStatusObj.status
+    else:
+      testStatusIMPL
 
   let
     localSuiteName =
@@ -1160,12 +1171,14 @@ template staticTest*(nameParam: string, body: untyped) =
       echo "[", TestStatus.OK, "     ] ", nameParam
 
 template dualTest*(nameParam: string, body: untyped) =
-  ## Similar to `test` but run the test both compuletime and run time, no
+  ## Similar to `test` but run the test both compiletime and run time, no
   ## matter the `unittest2Static` flag
+  testStatusObj.enabled = true
   staticTest nameParam:
     body
   runtimeTest nameParam:
     body
+  testStatusObj.enabled = false
 
 template test*(nameParam: string, body: untyped) =
   ## Define a single test case identified by `name`.
@@ -1181,12 +1194,14 @@ template test*(nameParam: string, body: untyped) =
   ## .. code-block::
   ##
   ##  [OK] roses are red
+  testStatusObj.enabled = true
   when nimvm:
     when unittest2Static:
       staticTest nameParam:
         body
   runtimeTest nameParam:
     body
+  testStatusObj.enabled = false
 
 {.pop.} # raises: []
 
