@@ -242,7 +242,8 @@ suite "break should works inside test body":
     check number == 2
 
 suite "Issue #43":
-  proc p = fail()
+  proc testfail = fail()
+  proc testcheckfalse = check false
 
   teardown:
     if testStatusObj.status != TestStatus.FAILED:
@@ -253,5 +254,8 @@ suite "Issue #43":
       testStatusObj.status = TestStatus.OK
       exitProcs.setProgramResult(QuitSuccess)
 
-  test "procedure defined outside the test scope fails":
-    p()
+  test "calls a procedure which fails and is defined outside the test scope":
+    testfail()
+
+  test "calls a procedure which checks false and is defined outside the test scope":
+    testcheckfalse()
