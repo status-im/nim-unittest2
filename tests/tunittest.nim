@@ -238,3 +238,13 @@ suite "break should works inside test body":
     number = 3
   test "step three":
     check number == 2
+
+suite "checks in `proc` should work":
+  teardown:
+    require testStatusIMPL == TestStatus.Failed
+    testStatusIMPL = TestStatus.OK
+
+  proc checkFalse() = check false
+
+  test "test":
+    checkFalse()
