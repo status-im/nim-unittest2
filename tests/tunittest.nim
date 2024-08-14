@@ -60,6 +60,17 @@ suite "PR #36":
     server = new(string)
     server[] = "hello"
 
+suite "checks in `proc` should work":
+  teardown:
+    require testStatusIMPL == TestStatus.Failed
+    testStatusIMPL = TestStatus.OK
+    exitProcs.setProgramResult(QuitSuccess)
+
+  proc checkFalse() = check false
+
+  test "test":
+    checkFalse()
+
 #------------------------------------------------------------------------------
 # Regular tests
 #------------------------------------------------------------------------------
@@ -238,13 +249,3 @@ suite "break should works inside test body":
     number = 3
   test "step three":
     check number == 2
-
-suite "checks in `proc` should work":
-  teardown:
-    require testStatusIMPL == TestStatus.Failed
-    testStatusIMPL = TestStatus.OK
-
-  proc checkFalse() = check false
-
-  test "test":
-    checkFalse()
