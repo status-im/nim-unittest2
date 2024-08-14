@@ -271,6 +271,7 @@ var
   testsFilters {.threadvar.}: HashSet[string]
 
   currentSuite {.threadvar.}: string
+  testStatus {.threadvar.}: TestStatus
 
 when collect:
   var
@@ -1025,8 +1026,7 @@ template fail* =
     echo "Tests failed"
     quit 1
   else:
-    when declared(testStatusIMPL):
-      testStatusIMPL = TestStatus.FAILED
+    testStatus = TestStatus.FAILED
 
     exitProcs.setProgramResult(1)
 
@@ -1060,7 +1060,7 @@ template skip* =
   else:
     bind checkpoints
 
-    testStatusIMPL = TestStatus.SKIPPED
+    testStatus = TestStatus.SKIPPED
     checkpoints = @[]
 
 proc runDirect(test: Test) =
@@ -1099,7 +1099,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
   bind collect, runDirect, shouldRun, checkpoints
 
   proc runTest(suiteName, testName: string): TestStatus {.raises: [], gensym.} =
-    var testStatusIMPL {.inject.} = TestStatus.OK
+    testStatus = TestStatus.OK
     let suiteName {.inject, used.} = suiteName
     let testName {.inject, used.} = testName
 
@@ -1133,7 +1133,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
     checkpoints = @[]
 
-    testStatusIMPL
+    testStatus
 
   let
     localSuiteName =
