@@ -1100,6 +1100,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
   proc runTest(suiteName, testName: string): TestStatus {.raises: [], gensym.} =
     testStatus = TestStatus.OK
+    template testStatusIMPL: untyped {.inject, used.} = testStatus
     let suiteName {.inject, used.} = suiteName
     let testName {.inject, used.} = testName
 
