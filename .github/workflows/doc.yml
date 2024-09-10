@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 10
 
     name: 'Generate & upload documentation'
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-latest'
     continue-on-error: true
     steps:
       - name: Checkout
@@ -19,7 +19,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: jiro4989/setup-nim-action@v1
+      - uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: 'stable'
 
