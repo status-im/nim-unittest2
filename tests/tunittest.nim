@@ -189,6 +189,13 @@ suite "test suite":
 
         check(a == b)
 
+    test "openArray":
+      let
+        a = [1, 2, 3]
+        b = [2, 2, 3]
+      check: # Ensure check can capture openArray without assigning to local
+        a.toOpenArray(1, 2) == b.toOpenArray(1, 2)
+
 when defined(testing):
   suite "test name filtering":
     test "test name":
