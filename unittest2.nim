@@ -1191,6 +1191,15 @@ template test*(nameParam: string, body: untyped) =
 
 {.pop.} # raises: []
 
+iterator unittest2EvalOnceIter[T](x: T): auto =
+  yield x
+iterator unittest2EvalOnceIter[T](x: var T): var T =
+  yield x
+
+template unittest2EvalOnce(name: untyped, param: typed, blk: untyped) =
+  for name in unittest2EvalOnceIter(param):
+    blk
+
 macro check*(conditions: untyped): untyped =
   ## Verify if a statement or a list of statements is true.
   ## A helpful error message and set checkpoints are printed out on
@@ -1210,21 +1219,18 @@ macro check*(conditions: untyped): untyped =
   let checked = callsite()[1]
   {.warning[Deprecated]:on.}
 
-  template asgn(a: untyped, value: typed) =
-    var a = value # XXX: we need "var: var" here in order to
-                  # preserve the semantics of var params
-
   template print(name: untyped, value: typed) =
     when compiles(string($value)):
       checkpoint(name & " was " & $value)
 
-  proc inspectArgs(exp: NimNode): tuple[assigns, check, printOuts: NimNode] =
+  proc inspectArgs(exp: NimNode): tuple[frame, inner, check, printOuts: NimNode] =
     result.check = copyNimTree(exp)
-    result.assigns = newNimNode(nnkStmtList)
+    result.inner = newNimNode(nnkStmtList)
     result.printOuts = newNimNode(nnkStmtList)
 
     var counter = 0
-
+    let evalOnce = bindSym("unittest2EvalOnce")
+    result.frame = result.inner
     if exp[0].kind in {nnkIdent, nnkOpenSymChoice, nnkClosedSymChoice, nnkSym} and
         $exp[0] in ["not", "in", "notin", "==", "<=",
                     ">=", "<", ">", "!=", "is", "isnot"]:
@@ -1239,7 +1245,7 @@ macro check*(conditions: untyped): untyped =
           if exp[i].kind in nnkCallKinds + {nnkDotExpr, nnkBracketExpr, nnkPar} and
                   (exp[i].typeKind notin {ntyTypeDesc} or $exp[0] notin ["is", "isnot"]):
             let callVar = newIdentNode(":c" & $counter)
-            result.assigns.add getAst(asgn(callVar, paramAst))
+            result.frame = nnkCall.newTree(evalOnce, callVar, paramAst, result.frame)
             result.check[i] = callVar
             result.printOuts.add getAst(print(argStr, callVar))
           if exp[i].kind == nnkExprEqExpr:
@@ -1249,22 +1255,20 @@ macro check*(conditions: untyped): untyped =
             result.check[i] = exp[i][1]
           if exp[i].typeKind notin {ntyTypeDesc}:
             let arg = newIdentNode(":p" & $counter)
-            result.assigns.add getAst(asgn(arg, paramAst))
+            result.frame = nnkCall.newTree(evalOnce, arg, paramAst, result.frame)
             result.printOuts.add getAst(print(argStr, arg))
             if exp[i].kind != nnkExprEqExpr:
               result.check[i] = arg
             else:
               result.check[i][1] = arg
 
-  proc buildCheck(lineinfo, callLit, assigns, check, printOuts: NimNode): NimNode =
+  proc buildCheck(lineinfo, callLit, check, printOuts: NimNode): NimNode =
     let
       checkpointSym = bindSym("checkpoint")
       failSym = bindSym("fail")
-
     nnkBlockStmt.newTree(
       newEmptyNode(),
       nnkStmtList.newTree(
-        assigns,
         nnkIfStmt.newTree(
           nnkElifBranch.newTree(
             nnkCall.newTree(ident("not"), check),
@@ -1295,11 +1299,12 @@ macro check*(conditions: untyped): untyped =
   case checked.kind
   of nnkCallKinds:
     let
-      (assigns, check, printOuts) = inspectArgs(checked)
+      (frame, inner, check, printOuts) = inspectArgs(checked)
       lineinfo = newStrLitNode(checked.lineInfo)
       callLit = checked.toStrLit
-    result = buildCheck(lineinfo, callLit, assigns, check, printOuts)
 
+    inner.add buildCheck(lineinfo, callLit, check, printOuts)
+    result = frame
   of nnkStmtList:
     result = newNimNode(nnkStmtList)
     for node in checked:
@@ -1312,7 +1317,7 @@ macro check*(conditions: untyped): untyped =
       callLit = checked.toStrLit
 
     result = buildCheck(
-      lineinfo, callLit, newEmptyNode(), checked, newEmptyNode())
+      lineinfo, callLit, checked, newEmptyNode())
 
 template require*(conditions: untyped) =
   ## Same as `check` except any failed test causes the program to quit
