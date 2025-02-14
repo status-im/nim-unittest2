@@ -615,15 +615,22 @@ method suiteEnded*(formatter: ConsoleOutputFormatter) =
     totalDurStr = formatDuration(totalDur, false)
 
   if formatter.outputLevel == OutputLevel.COMPACT:
-    # Complete the line with timing information
-    formatter.write do:
-      if totalDur > slowThreshold:
-        stdout.styledWrite(" ", styleBright, totalDurStr)
-      else:
-        stdout.write(" ", totalDurStr)
-      echo ""
-    do:
-      echo(" ", totalDurStr)
+    if formatter.results.len > 0:
+      # Complete the line with timing information
+      formatter.write do:
+        if totalDur > slowThreshold:
+          stdout.styledWrite(" ", styleBright, totalDurStr)
+        else:
+          stdout.write(" ", totalDurStr)
+        echo ""
+      do:
+        echo(" ", totalDurStr)
+    else:
+      formatter.write do:
+        # If no tests were run, remove the suite name
+        stdout.eraseLine()
+      do:
+        stdout.writeLine("")
 
   var failed = false
   if formatter.outputLevel notin {VERBOSE, FAILURES}:
