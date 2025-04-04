@@ -22,6 +22,7 @@ discard """
 
 import ../unittest2, sequtils
 from std/exitprocs import nil
+import std/[osproc, strutils]
 
 #------------------------------------------------------------------------------
 # Tests using backdoors
@@ -256,3 +257,13 @@ suite "break should works inside test body":
     number = 3
   test "step three":
     check number == 2
+
+suite "list tests":
+  test "should list tests when `-d:listTests` is passed":    
+
+    let (output, exitCode) = execCmdEx("nim c -d:listTests tests/sampletests.nim")
+    
+    check exitCode == 0
+    check count(output, "Suite:") == 2
+    check count(output, "Test:") == 5
+    check count(output, "File:") == 5

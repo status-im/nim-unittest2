@@ -160,6 +160,7 @@ const
     ## enabled at compile-time meaning that tests must be written
     ## conservatively. `suite` features (`setup` etc) in particular are not
     ## supported.
+  listTests* {.booldefine.} = false #List tests at compile time (useful for test runners)
 
 when useTerminal:
   import std/terminal
@@ -955,6 +956,10 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##    [OK] (2 + -2) != 4
   bind collect, currentSuite, suiteStarted, suiteEnded
 
+  when listTests:
+    static:
+      echo "\nSuite: ", nameParam
+  
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
       var testSetupIMPLFlag {.used.} = true
@@ -1189,6 +1194,15 @@ template test*(nameParam: string, body: untyped) =
   ## .. code-block::
   ##
   ##  [OK] roses are red
+  when listTests:
+    static:
+      when declared(suiteName):
+        echo "\tTest: ", nameParam
+        echo "\tFile: ", instantiationInfo().filename, ":", instantiationInfo().line
+      else:
+        echo "Test: ", nameParam
+        echo "File: ", instantiationInfo().filename, ":", instantiationInfo().line
+      echo ""
   when nimvm:
     when unittest2Static:
       staticTest nameParam:
