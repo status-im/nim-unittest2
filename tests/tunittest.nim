@@ -259,11 +259,11 @@ suite "break should works inside test body":
     check number == 2
 
 suite "list tests":
-  test "should list tests when `-d:listTests` is passed":    
+  test "should list tests when `-d:unittest2ListTests` is passed":    
 
-    let (output, exitCode) = execCmdEx("nim c -d:listTests tests/sampletests.nim")
+    let (output, exitCode) = execCmdEx("nim c -d:unittest2ListTests -r tests/sampletests.nim")
     
     check exitCode == 0
-    check count(output, "Suite:") == 2
-    check count(output, "Test:") == 5
-    check count(output, "File:") == 5
+    check count(output, "Suite:") == 3
+    check count(output, "Test:") == 16
+    check count(output, "File:") == 16

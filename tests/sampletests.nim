@@ -17,3 +17,9 @@ suite "Sample Suite":
   test "Sample Test 3":
     check(1 == 1)
 
+test "another global test":
+  check(1 == 1)
+
+for i in 0..<10:
+ test "test" & $i:
+    echo "hello"
