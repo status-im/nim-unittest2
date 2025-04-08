@@ -267,3 +267,4 @@ suite "list tests":
     check count(output, "Suite:") == 3
     check count(output, "Test:") == 16
     check count(output, "File:") == 16
+    check count(output, "Hello") == 0

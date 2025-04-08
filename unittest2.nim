@@ -1141,7 +1141,8 @@ template runtimeTest*(nameParam: string, body: untyped) =
       defer: failingOnExceptions("[teardown] "):
         when declared(testTeardownIMPLFlag): testTeardownIMPL()
       failingOnExceptions(""):
-        body
+        when not unittest2ListTests:
+          body
 
     checkpoints = @[]
 
@@ -1181,9 +1182,11 @@ template dualTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but run the test both compuletime and run time, no
   ## matter the `unittest2Static` flag
   staticTest nameParam:
-    body
+    when not unittest2ListTests:
+      body
   runtimeTest nameParam:
-    body
+    when not unittest2ListTests:
+      body
 
 template test*(nameParam: string, body: untyped) =
   ## Define a single test case identified by `name`.
@@ -1202,9 +1205,11 @@ template test*(nameParam: string, body: untyped) =
   when nimvm:
     when unittest2Static:
       staticTest nameParam:
-        body
+        when not unittest2ListTests:
+          body
   runtimeTest nameParam:
-    body
+    when not unittest2ListTests:
+      body
 
 {.pop.} # raises: []
 
