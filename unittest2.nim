@@ -160,12 +160,14 @@ const
     ## enabled at compile-time meaning that tests must be written
     ## conservatively. `suite` features (`setup` etc) in particular are not
     ## supported.
+  unittest2ListTests* {.booldefine.} = false
+    ## List tests at runtime (useful for test runners)
 
 when useTerminal:
   import std/terminal
 
 const
-  collect = (not unittest2NoCollect and not unittest2Compat) or unittest2PreviewIsolate
+  collect = (not unittest2NoCollect and not unittest2Compat) or unittest2PreviewIsolate or unittest2ListTests
   autoParseArgs = not unittest2DisableParamFiltering
   isolate = unittest2PreviewIsolate
 
@@ -187,6 +189,8 @@ type
     suiteName: string
     testName: string
     impl: proc(suite, name: string): TestStatus
+    lineInfo: int
+    filename: string
 
   TestStatus* = enum ## The status of a test when it is done.
     OK,
@@ -1137,7 +1141,8 @@ template runtimeTest*(nameParam: string, body: untyped) =
       defer: failingOnExceptions("[teardown] "):
         when declared(testTeardownIMPLFlag): testTeardownIMPL()
       failingOnExceptions(""):
-        body
+        when not unittest2ListTests:
+          body
 
     checkpoints = @[]
 
@@ -1152,7 +1157,13 @@ template runtimeTest*(nameParam: string, body: untyped) =
   if shouldRun(localSuiteName, localTestName):
     let
       instance =
-        Test(testName: localTestName, suiteName: localSuiteName, impl: runTest)
+        Test(
+          testName: localTestName, 
+          suiteName: localSuiteName, 
+          impl: runTest,
+          lineInfo: instantiationInfo().line,
+          filename: instantiationInfo().filename
+        )
     when collect:
       tests.mgetOrPut(localSuiteName, default(seq[Test])).add(instance)
     else:
@@ -1171,9 +1182,11 @@ template dualTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but run the test both compuletime and run time, no
   ## matter the `unittest2Static` flag
   staticTest nameParam:
-    body
+    when not unittest2ListTests:
+      body
   runtimeTest nameParam:
-    body
+    when not unittest2ListTests:
+      body
 
 template test*(nameParam: string, body: untyped) =
   ## Define a single test case identified by `name`.
@@ -1192,9 +1205,11 @@ template test*(nameParam: string, body: untyped) =
   when nimvm:
     when unittest2Static:
       staticTest nameParam:
-        body
+        when not unittest2ListTests:
+          body
   runtimeTest nameParam:
-    body
+    when not unittest2ListTests:
+      body
 
 {.pop.} # raises: []
 
@@ -1470,24 +1485,33 @@ when collect:
     # supported
     while tests.len > 0:
       var tmp = move(tests)
-      suiteRunStarted(tmp)
-      for suiteName, suite in tmp:
-        if suite.len == 0: continue
+      when unittest2ListTests:
+        for suiteName, suite in tmp:
+          if suite.len == 0: continue
+          echo "Suite: ", suiteName
+          for test in suite:
+            echo "\tTest: ", test.testName
+            echo "\tFile: ", test.filename, ":", test.lineInfo
+      else:
+        suiteRunStarted(tmp)
+        for suiteName, suite in tmp:
+          if suite.len == 0: continue
 
-        suiteStarted(suiteName)
-        for test in suite:
-          when isolate:
-            if not isolated:
-              runIsolated(test)
+          suiteStarted(suiteName)
+          for test in suite:
+            when isolate:
+              if not isolated:
+                runIsolated(test)
+              else:
+                runDirect(test)
             else:
               runDirect(test)
-          else:
-            runDirect(test)
 
-        suiteEnded()
+          suiteEnded()
 
-      suiteRunEnded()
-    testRunEnded()
+        suiteRunEnded()
+    when not unittest2ListTests:
+      testRunEnded()
 
   addExitProc(runScheduledTests)
 
