@@ -32,16 +32,8 @@ template ok*[T: not void, E](self: var Result[T, E], x: untyped) =
 template err[T; E: not void](R: type Result[T, E], x: untyped): R =
   R(oResultPrivate: false, eResultPrivate: x)
 
-template err[T](R: type Result[T, cstring], x: string): R =
-  const s = x # avoid dangling cstring pointers
-  R(oResultPrivate: false, eResultPrivate: cstring(s))
-
 template err[T; E: not void](self: var Result[T, E], x: untyped) =
   self = err(type self, x)
-
-template err[T](self: var Result[T, cstring], x: string) =
-  const s = x # Make sure we don't return a dangling pointer
-  self = err(type self, cstring(s))
 
 template ok*(v: auto): auto =
   ok(typeof(result), v)
@@ -51,9 +43,6 @@ template ok*(): auto =
 
 template err*(v: auto): auto =
   err(typeof(result), v)
-
-template err*(): auto =
-  err(typeof(result))
 
 func mapConvert*[T0: not void, E](
     self: Result[T0, E], T1: type

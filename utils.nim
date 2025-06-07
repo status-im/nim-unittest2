@@ -13,10 +13,6 @@ type
     rlpList
 
   RlpError* = object of CatchableError
-  MalformedRlpError* = object of RlpError
-  UnsupportedRlpError* = object of RlpError
-  RlpTypeMismatch* = object of RlpError
-
   RlpItem = tuple[payload: Slice[int], typ: RlpNodeType]
 
 template view(input: openArray[byte], position: int): openArray[byte] =
@@ -42,7 +38,7 @@ func rlpItem(input: openArray[byte], start = 0): RlpItem =
     prefix = input[start]
 
   if prefix <= 0x7f:
-    (start .. start, rlpBlob)
+    raiseAssert "FOO1"
   elif prefix <= 0xb7:
     let strLen = int(prefix - 0x80)
     if strLen >= length:
@@ -51,25 +47,8 @@ func rlpItem(input: openArray[byte], start = 0): RlpItem =
       raiseAssert ""
 
     (start + 1 .. start + strLen, rlpBlob)
-  elif prefix <= 0xbf:
-
-    let
-      lenOfStrLen = int(prefix - 0xb7)
-      strLen = decodeInteger()
-
-    if strLen < THRESHOLD_LIST_LEN:
-      raiseAssert ""
-
-    if strLen >= uint64(length - lenOfStrLen):
-      raiseAssert ""
-
-    (start + 1 + lenOfStrLen .. start + lenOfStrLen + int(strLen), rlpBlob)
   elif prefix <= 0xf7:
-    let listLen = int(prefix - 0xc0)
-    if listLen >= length:
-      raiseAssert ""
-
-    (start + 1 .. start + listLen, rlpList)
+    raiseAssert "FOO4"
   else:
     let
       lenOfListLen = int(prefix - 0xf7)
