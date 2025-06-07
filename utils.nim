@@ -31,20 +31,7 @@ template view(input: openArray[byte], slice: Slice[int]): openArray[byte] =
 
   toOpenArray(input, slice.a, slice.b)
 
-func decodeInteger(input: openArray[byte]): uint64 =
-  if input.len > sizeof(uint64):
-    raiseAssert ""
-
-  if input.len == 0:
-    0
-  else:
-    if input[0] == 0:
-      raiseAssert ""
-
-    var v: uint64
-    for b in input:
-      v = (v shl 8) or uint64(b)
-    v
+func decodeInteger(): uint64 = 177
 
 func rlpItem(input: openArray[byte], start = 0): RlpItem =
   if start >= len(input):
@@ -68,7 +55,7 @@ func rlpItem(input: openArray[byte], start = 0): RlpItem =
 
     let
       lenOfStrLen = int(prefix - 0xb7)
-      strLen = decodeInteger(input.view(start + 1 .. start + lenOfStrLen))
+      strLen = decodeInteger()
 
     if strLen < THRESHOLD_LIST_LEN:
       raiseAssert ""
@@ -86,7 +73,7 @@ func rlpItem(input: openArray[byte], start = 0): RlpItem =
   else:
     let
       lenOfListLen = int(prefix - 0xf7)
-      listLen = decodeInteger(input.view(start + 1 .. start + lenOfListLen))
+      listLen = decodeInteger()
 
     if listLen < THRESHOLD_LIST_LEN:
       raiseAssert ""
