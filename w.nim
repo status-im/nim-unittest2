@@ -158,14 +158,6 @@ proc replaceNodes2(ast: NimNode, what: NimNode, by: NimNode): NimNode =
       rTree
   inspect(ast)
 
-macro staticFor(idx: untyped{nkIdent}, slice: static Slice[int], body: untyped): untyped =
-  result = newNimNode(nnkStmtList, lineInfoFrom = body)
-  for i in slice:
-    result.add nnkBlockStmt.newTree(
-      ident(":staticFor" & $idx & $i),
-      body.replaceNodes2(idx, newLit i)
-    )
-
 type
   NibblesBuf = object
     limbs: array[4, uint64]
@@ -186,28 +178,12 @@ func `[]`(r: NibblesBuf, i: int): byte =
 func fromBytes(T: type NibblesBuf, bytes: openArray[byte]): T =
   if bytes.len >= 32:
     result.iend = 64
-    staticFor i, 0 ..< result.limbs.len:
-      const pos = i * 8 # 16 nibbles per limb, 2 nibbles per byte
-      result.limbs[i] = uint64.fromBytes(bytes.toOpenArray(pos, pos + 7))
   else:
     let blen = uint8(bytes.len)
     result.iend = blen * 2
 
     block done:
-      staticFor i, 0 ..< result.limbs.len:
-        const pos = i * 8
-        if pos + 7 < blen:
-          result.limbs[i] = uint64.fromBytes(bytes.toOpenArray(pos, pos + 7))
-        else:
-          if pos < blen:
-            var tmp = 0'u64
-            var shift = 56'u8
-            for j in uint8(pos) ..< blen:
-              tmp = tmp or uint64(bytes[j]) shl shift
-              shift -= 8
-
-            result.limbs[i] = tmp
-          break done
+      discard
 
 func len(r: NibblesBuf): int =
   int(r.iend)
