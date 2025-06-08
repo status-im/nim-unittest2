@@ -1,7 +1,6 @@
 proc fromHex(a: string): seq[byte] =
   var buf = newSeq[byte](len(a) shr 1)
-  let res = 1
-  buf.setLen(res)
+  buf.setLen(1)
 
 type
   MDigest[bits: static[int]] = object
@@ -121,9 +120,6 @@ type
   GenesisAccount = object
     foo: string
 
-  NetworkParams = object
-    genesis: Genesis
-
 import std/macros
 
 macro fillArrayOfBlockNumberBasedForkOptionals(conf, tmp: typed): untyped =
@@ -132,48 +128,18 @@ macro fillArrayOfBlockNumberBasedForkOptionals(conf, tmp: typed): untyped =
 
 import
   std/sequtils
-  #nimcrypto/hash as foobar
 
 type
   SomeEndianInt = uint8|uint64
 
-func swapBytes(x: uint8): uint8 = x
-func swapBytes(x: uint16): uint16 = (x shl 8) or (x shr 8)
-
-func swapBytes(x: uint32): uint32 =
-  let v = (x shl 16) or (x shr 16)
-
-  ((v shl 8) and 0xff00ff00'u32) or ((v shr 8) and 0x00ff00ff'u32)
-
-func swapBytes(x: uint64): uint64 =
-  var v = (x shl 32) or (x shr 32)
-  v =
-    ((v and 0x0000ffff0000ffff'u64) shl 16) or
-    ((v and 0xffff0000ffff0000'u64) shr 16)
-
-  ((v and 0x00ff00ff00ff00ff'u64) shl 8) or
-    ((v and 0xff00ff00ff00ff00'u64) shr 8)
-
 func fromBytes(
     T: typedesc[SomeEndianInt],
-    x: openArray[byte],
-    endian: Endianness = system.cpuEndian): T =
-
-  doAssert x.len >= sizeof(T), "Not enough bytes for endian conversion"
-
+    x: openArray[byte]): T =
   when nimvm: # No copyMem in vm
     for i in 0..<sizeof(result):
       result = result or (T(x[i]) shl (i * 8))
   else:
     copyMem(addr result, unsafeAddr x[0], sizeof(result))
-
-  if endian != system.cpuEndian:
-    result = swapBytes(result)
-
-func fromBytesBE(
-    T: typedesc[SomeEndianInt],
-    x: openArray[byte]): T =
-  fromBytes(T, x, bigEndian)
 
 proc replaceNodes2(ast: NimNode, what: NimNode, by: NimNode): NimNode =
   proc inspect(node: NimNode): NimNode =
@@ -222,7 +188,7 @@ func fromBytes(T: type NibblesBuf, bytes: openArray[byte]): T =
     result.iend = 64
     staticFor i, 0 ..< result.limbs.len:
       const pos = i * 8 # 16 nibbles per limb, 2 nibbles per byte
-      result.limbs[i] = uint64.fromBytesBE(bytes.toOpenArray(pos, pos + 7))
+      result.limbs[i] = uint64.fromBytes(bytes.toOpenArray(pos, pos + 7))
   else:
     let blen = uint8(bytes.len)
     result.iend = blen * 2
@@ -231,7 +197,7 @@ func fromBytes(T: type NibblesBuf, bytes: openArray[byte]): T =
       staticFor i, 0 ..< result.limbs.len:
         const pos = i * 8
         if pos + 7 < blen:
-          result.limbs[i] = uint64.fromBytesBE(bytes.toOpenArray(pos, pos + 7))
+          result.limbs[i] = uint64.fromBytes(bytes.toOpenArray(pos, pos + 7))
         else:
           if pos < blen:
             var tmp = 0'u64
