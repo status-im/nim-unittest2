@@ -1,7 +1,5 @@
 const
-  BLOB_START_MARKER = byte(0x80)
   LIST_START_MARKER = byte(0xc0)
-  THRESHOLD_LIST_LEN = 56
 
 type
   Rlp* = object
@@ -14,12 +12,6 @@ type
 
   RlpError* = object of CatchableError
   RlpItem = tuple[payload: Slice[int], typ: RlpNodeType]
-
-template view(input: openArray[byte], position: int): openArray[byte] =
-  if position >= input.len:
-    raiseOutOfBounds()
-
-  toOpenArray(input, position, input.high())
 
 template view(input: openArray[byte], slice: Slice[int]): openArray[byte] =
   if slice.b >= input.len:
@@ -47,18 +39,10 @@ func rlpItem(input: openArray[byte], start = 0): RlpItem =
       raiseAssert ""
 
     (start + 1 .. start + strLen, rlpBlob)
-  elif prefix <= 0xf7:
-    raiseAssert "FOO4"
   else:
     let
       lenOfListLen = int(prefix - 0xf7)
       listLen = decodeInteger()
-
-    if listLen < THRESHOLD_LIST_LEN:
-      raiseAssert ""
-
-    if listLen >= uint64(length - lenOfListLen):
-      raiseAssert ""
 
     (start + 1 + lenOfListLen .. start + lenOfListLen + int(listLen), rlpList)
 
@@ -74,19 +58,8 @@ func rlpFromBytes*(data: openArray[byte]): Rlp =
 func rlpFromBytes*(data: sink seq[byte]): Rlp =
   Rlp(bytes: move(data), position: 0)
 
-const zeroBytesRlp* = Rlp()
-
-func hasData*(self: Rlp, position: int): bool =
+func hasData(self: Rlp, position: int): bool =
   position < self.bytes.len
-
-func hasData*(self: Rlp): bool =
-  self.hasData(self.position)
-
-func isEmpty*(self: Rlp): bool =
-  self.hasData() and (
-    self.bytes[self.position] == BLOB_START_MARKER or
-    self.bytes[self.position] == LIST_START_MARKER
-  )
 
 func isList*(self: Rlp, position: int): bool =
   self.hasData(position) and self.bytes[position] >= LIST_START_MARKER
@@ -94,45 +67,15 @@ func isList*(self: Rlp, position: int): bool =
 func isList*(self: Rlp): bool =
   self.isList(self.position)
 
-func toInt(self: Rlp, item: RlpItem, IntType: type): IntType =
-  mixin maxBytes, to
-  if item.typ != rlpBlob:
-    raiseAssert ""
-
-  if item.payload.len > maxBytes(IntType):
-    raiseAssert ""
-
-  for b in self.bytes.view(item.payload):
-    result = (result shl 8) or IntType(b)
-
-func toInt(self: Rlp, IntType: type): IntType =
-  self.toInt(self.item(), IntType)
-
 func toBytes*(self: Rlp, item: RlpItem): seq[byte] =
-  if item.typ != rlpBlob:
-    raiseAssert ""
-
   @(self.bytes.view(item.payload))
 
 func toBytes*(self: Rlp): seq[byte] =
   self.toBytes(self.item())
 
-func currentElemEnd(self: Rlp, position: int): int =
-  let item = self.item(position).payload
-  item.b + 1
-
+func currentElemEnd(self: Rlp, position: int): int = discard
 func currentElemEnd(self: Rlp): int =
   self.currentElemEnd(self.position)
-
-template iterateIt(self: Rlp, position: int, body: untyped) =
-  let item = self.item(position)
-  doAssert item.typ == rlpList
-  var it {.inject.} = item.payload.a
-  let last = item.payload.b
-  while it <= last:
-    let subItem = rlpItem(self.bytes.view(it .. last)).payload
-    body
-    it += subItem.b + 1
 
 func listElem*(self: Rlp, i: int): Rlp =
   let item = self.item()
@@ -149,13 +92,6 @@ func listElem*(self: Rlp, i: int): Rlp =
     dec i
 
   rlpFromBytes self.bytes.view(start .. start + payload.b)
-
-func listLen*(self: Rlp): int =
-  if not self.isList():
-    return 0
-
-  self.iterateIt(self.position):
-    inc result
 
 template rawData*(self: Rlp): openArray[byte] =
   self.bytes.toOpenArray(self.position, self.currentElemEnd - 1)

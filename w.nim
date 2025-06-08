@@ -1,64 +1,12 @@
 proc fromHex(a: string): seq[byte] =
   var buf = newSeq[byte](len(a) shr 1)
-  buf.setLen(1)
-
-type
-  MDigest[bits: static[int]] = object
-    data: array[bits div 8, byte]
-
-template sizeDigest(): uint = 32
-proc finish(data: var openArray[byte]): uint =
-  if len(data) >= int(sizeDigest):
-    for i in 0 ..< int(sizeDigest):
-      data[i] = 0
-    result = sizeDigest
-
-proc finish(): MDigest[256] =
-  discard finish(result.data)
-
-import std/typetraits
-
-func assign[T](tgt: var openArray[T], src: openArray[T]) =
-  doAssert tgt.len <= src.len
-  for i in 0..<tgt.len:
-    tgt[i] = src[i]
-
-proc readHexChar(c: char): byte {.noSideEffect, inline.} = discard
-
-template skip0xPrefix(hexStr: openArray[char]): int = 0
-
-func hexToByteArrayImpl(
-    hexStr: openArray[char], output: var openArray[byte], fromIdx, toIdx: int):
-    int =
-  var sIdx = skip0xPrefix(hexStr)
-  let sz = toIdx + 1 - fromIdx
-  sIdx += fromIdx * 2
-  for bIdx in fromIdx ..< sz + fromIdx:
-    output[bIdx] =
-      (hexStr[sIdx].readHexChar shl 4) or
-      hexStr[sIdx + 1].readHexChar
-    inc(sIdx, 2)
-
-  sIdx
-
-func hexToByteArrayStrict(hexStr: openArray[char], output: var openArray[byte]) =
-  if hexToByteArrayImpl(hexStr, output, 0, output.high) != hexStr.len:
-    raise (ref ValueError)(msg: "hex string too long")
-
-func hexToByteArrayStrict(hexStr: openArray[char], N: static int): array[N, byte]
-                          {.inline.}=
-  hexToByteArrayStrict(hexStr, result)
 
 type
   FixedBytes[N: static int] = array[N, byte]
 
-func copyFrom[N: static int](T: type FixedBytes[N], v: openArray[byte], start = 0): T =
+func copyFrom(v: openArray[byte], start = 0): FixedBytes[32] =
   if v.len > start:
-    let n = min(N, v.len - start)
-    assign(distinctBase(result).toOpenArray(0, n - 1), v.toOpenArray(start, start + n - 1))
-
-func fromHex(T: type FixedBytes, c: openArray[char]): T {.raises: [ValueError].} =
-  T(hexToByteArrayStrict(c, T.N))
+    let n = min(32, v.len - start)
 
 import
   ./secp256k1
@@ -83,21 +31,17 @@ proc getAccountProof(): seq[seq[byte]] =
 type
   Hash32 = distinct FixedBytes[32]
 
-func fromHex(_: type Hash32, s: openArray[char]): Hash32 {.raises: [ValueError].} =
-  Hash32(FixedBytes[32].fromHex(s))
+func fromHex(_: type Hash32, s: openArray[char]): Hash32 {.raises: [ValueError].} = discard
 
 type
   PrivateKey = distinct SkSecretKey
 
-func fromHex(T: type PrivateKey, data: string) =
-  discard SkSecretKey.fromHex(data).mapConvert(T)
-
+func fromHex(T: type PrivateKey, data: string) = discard
 import ./utils, std/tables
 
 type
   DbTransaction = ref object
     parentTransaction: DbTransaction
-    modifications: Table[seq[byte], int]
 
 proc put(db: var Table[seq[byte], int], key: openArray[byte]) =
   db.withValue(@key, _) do:
@@ -113,12 +57,8 @@ proc get(t: var DbTransaction, key: openArray[byte]) =
     t = t.parentTransaction
 
 type
-  Genesis = object
-    alloc      : GenesisAlloc
-
   GenesisAlloc = Table[string, GenesisAccount]
   GenesisAccount = object
-    foo: string
 
 import std/macros
 
@@ -126,64 +66,38 @@ macro fillArrayOfBlockNumberBasedForkOptionals(conf, tmp: typed): untyped =
   result = newStmtList()
   for _, _ in ["homesteadBlock"]: discard
 
-import
-  std/sequtils
+template toSeq(s: not iterator): untyped =
+  #doAssert false  # hm, weird, it doesn't trigger
+  type OutType = typeof(items(s))
+  evalOnceAs(s2, s, compiles((let _ = s)))
+  var i = 0
+  var result = newSeq[OutType](s2.len)
+  for it in s2:
+    result[i] = it
+    i += 1
+  result
 
-type
-  SomeEndianInt = uint8|uint64
+macro evalOnceAs(expAlias, exp: untyped,
+                 letAssigneable: static[bool]): untyped =
+  expectKind(expAlias, nnkIdent)
+  var val = exp
 
-func fromBytes(
-    T: typedesc[SomeEndianInt],
-    x: openArray[byte]): T =
-  when nimvm: # No copyMem in vm
-    for i in 0..<sizeof(result):
-      result = result or (T(x[i]) shl (i * 8))
-  else:
-    copyMem(addr result, unsafeAddr x[0], sizeof(result))
+  result = newStmtList()
+  if exp.kind != nnkSym and letAssigneable:
+    val = genSym()
+    result.add(newLetStmt(val, exp))
 
-proc replaceNodes2(ast: NimNode, what: NimNode, by: NimNode): NimNode =
-  proc inspect(node: NimNode): NimNode =
-    case node.kind:
-    of {nnkIdent, nnkSym}:
-      if node.eqIdent(what):
-        by
-      else:
-        node
-    of nnkEmpty, nnkLiterals:
-      node
-    else:
-      let rTree = newNimNode(node.kind, lineInfoFrom = node)
-      for child in node:
-        rTree.add inspect(child)
-      rTree
-  inspect(ast)
+  result.add(
+    newProc(name = genSym(nskTemplate, $expAlias), params = [getType(untyped)],
+      body = val, procType = nnkTemplateDef))
 
 type
   NibblesBuf = object
     limbs: array[4, uint64]
     iend: uint8
 
-template limb(i: int | uint8): uint8 =
-  uint8(i) shr 4 # shr 4 = div 16 = 16 nibbles per limb
-
-template shift(i: int | uint8): uint8 =
-  60 - ((uint8(i) mod 16) shl 2) # shl 2 = 4 bits per nibble
-
-func `[]`(r: NibblesBuf, i: int): byte =
-  let
-    ilimb = i.limb
-    ishift = i.shift
-  byte((r.limbs[ilimb] shr ishift) and 0x0f)
-
 func fromBytes(T: type NibblesBuf, bytes: openArray[byte]): T =
-  if bytes.len >= 32:
-    result.iend = 64
-  else:
-    let blen = uint8(bytes.len)
-    result.iend = blen * 2
-
-    block done:
-      discard
+  result.iend = 64
 
 func len(r: NibblesBuf): int =
   int(r.iend)
@@ -204,20 +118,8 @@ type
     of ValueNode:
       value: seq[byte]
 
-proc getListLen(rlp: Rlp): Result[int, string] =
-  try:
-    ok(rlp.listLen)
-  except RlpError as e:
-    err(e.msg)
-
 proc getListElem(rlp: Rlp, idx: int): Result[Rlp, string] =
-  if not rlp.isList:
-    return err("rlp element is not a list")
-
-  try:
-    ok(rlp.listElem(idx))
-  except RlpError as e:
-    err(e.msg)
+  ok(rlp.listElem(idx))
 
 proc blobBytes(rlp: Rlp): Result[seq[byte], string] =
   try:
@@ -226,17 +128,13 @@ proc blobBytes(rlp: Rlp): Result[seq[byte], string] =
     err(e.msg)
 
 proc getRawRlpBytes(rlp: Rlp): Result[seq[byte], string] =
-  try:
-    ok(toSeq(rlp.rawData))
-  except RlpError as e:
-    err(e.msg)
+  ok(toSeq(rlp.rawData))
 
 proc getNextNode(nodeRlp: Rlp, key: NibblesBuf): Result[NextNodeResult, string] =
   var currNode = nodeRlp
   var restKey = key
 
   template handleNextRef(nextRef: Rlp, keyLen: int) =
-    doAssert nextRef.hasData
     if nextRef.isList:
       let rawBytes = ?nextRef.getRawRlpBytes()
       if len(rawBytes) > 32:
@@ -248,7 +146,7 @@ proc getNextNode(nodeRlp: Rlp, key: NibblesBuf): Result[NextNodeResult, string] 
       if len(nodeBytes) == 32:
         return ok(
           NextNodeResult(
-            kind: HashNode, nextNodeHash: Hash32(FixedBytes[32].copyFrom(nodeBytes, 0))
+            kind: HashNode, nextNodeHash: Hash32(copyFrom(nodeBytes, 0))
           )
         )
       elif len(nodeBytes) == 0:
@@ -256,24 +154,13 @@ proc getNextNode(nodeRlp: Rlp, key: NibblesBuf): Result[NextNodeResult, string] 
       else:
         return err("reference rlp blob should have 0 or 32 bytes")
   while true:
-    let listLen = ?currNode.getListLen()
     block:
       if len(restKey) == 0:
         let value = ?currNode.getListElem(16)
-
-        if not value.hasData():
-          return err("expected branch terminator")
-
-        if value.isList():
-          return err("branch value cannot be list")
-
-        if value.isEmpty():
-          return ok(NextNodeResult(kind: EmptyValue))
-        else:
-          let bytes = ?value.blobBytes()
-          return ok(NextNodeResult(kind: ValueNode, value: bytes))
+        let bytes = ?value.blobBytes()
+        return ok(NextNodeResult(kind: ValueNode, value: bytes))
       else:
-        let nextRef = ?currNode.getListElem(restKey[0].int)
+        let nextRef = ?currNode.getListElem(0)
 
         handleNextRef(nextRef, 1)
 
@@ -295,21 +182,19 @@ proc verifyProof(key: openArray[byte], foo0: seq[byte]) =
 
 proc verifyMptProof(
     branch: seq[seq[byte]], key: openArray[byte]) =
-  var t: Table[seq[byte], int]
-  let nodeHash = Hash32(finish().data)
   for _ in branch:
-    t.put(distinctBase(nodeHash))
+    discard
 
   verifyProof(key, branch[0])
 
 proc getGenesisAlloc(): GenesisAlloc =
-  {"a": GenesisAccount(foo: "b")}.toTable()
+  {"a": GenesisAccount()}.toTable()
 
 let
   _ = getGenesisAlloc()
   _ = Hash32.fromHex("9e6f9f140138677c62d4261312b15b1d26a6d60cb3fa966dd186cb4f04339d77")
 
-verifyMptProof(getAccountProof(), distinctBase(static(Hash32.fromHex("227a737497210f7cc2f464e3bfffadefa9806193ccdf873203cd91c8d3eab518"))))
+verifyMptProof(getAccountProof(), FixedBytes[32](static(Hash32.fromHex("227a737497210f7cc2f464e3bfffadefa9806193ccdf873203cd91c8d3eab518"))))
 
 import
   ./unittest2

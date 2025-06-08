@@ -1,14 +1,11 @@
 type
   Result*[T, E] = object
     when T is void:
-      when E is void:
-        oResultPrivate: bool
-      else:
-        case oResultPrivate: bool
-        of false:
-          eResultPrivate: E
-        of true:
-          discard
+      case oResultPrivate: bool
+      of false:
+        eResultPrivate: E
+      of true:
+        discard
     else:
       when E is void:
         case oResultPrivate: bool
@@ -43,21 +40,6 @@ template ok*(): auto =
 
 template err*(v: auto): auto =
   err(typeof(result), v)
-
-func mapConvert*[T0: not void, E](
-    self: Result[T0, E], T1: type
-): Result[T1, E] {.inline.} =
-  case self.oResultPrivate
-  of true:
-    when T1 is void:
-      result.ok()
-    else:
-      result.ok(T1(self.vResultPrivate))
-  of false:
-    when E is void:
-      result.err()
-    else:
-      result.err(self.eResultPrivate)
 
 const pushGenericsOpenSym = defined(nimHasGenericsOpenSym2)
 
@@ -94,15 +76,4 @@ template `?`*[T, E](self: Result[T, E]): auto =
       v.vResultPrivate
 
 type
-  SkSecretKey* {.requiresInit.} = object
-
-  SkResult[T] = Result[T, cstring]
-
-func fromHex(T: type seq[byte], s: string): SkResult[T] =
-  ok(default(seq[byte]))
-
-func fromRaw(T: type SkSecretKey, data: openArray[byte]): SkResult[T] =
-  ok(T())
-
-func fromHex*(T: type SkSecretKey, data: string): SkResult[T] =
-  T.fromRaw(? seq[byte].fromHex(data))
+  SkSecretKey* = object
