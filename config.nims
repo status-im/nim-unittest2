@@ -1,4 +1,7 @@
 --verbosity:0
+--hints:off
+--warnings:off
+#--nimcache:(mktemp -d)
 switch("passC", "-flto -O3")
 switch("passL", "-flto -O3")
 switch("passC", "-finline-limit=1000")
