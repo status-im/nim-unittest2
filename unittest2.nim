@@ -23,7 +23,7 @@ proc parseParameters(args: openArray[string]) =
 
   for str in args:
     if str == "--xml:" or str == "--xml=":
-      hasXml = str[("--xml".len + 1)..^1] # skip separator char as well
+      hasXml = str["--xml".len..^1] # skip separator char as well
     else:
       testsFilters.incl(str)
 

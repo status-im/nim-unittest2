@@ -1,9 +1,6 @@
-const
-  LIST_START_MARKER = byte(0xc0)
-
 type
   Rlp* = object
-    bytes: seq[byte]
+    bytes*: seq[byte]
     position*: int
 
   RlpNodeType = enum
@@ -20,22 +17,11 @@ template view(input: openArray[byte], slice: Slice[int]): openArray[byte] =
   toOpenArray(input, slice.a, slice.b)
 
 func rlpItem(input: openArray[byte], start = 0): RlpItem =
-  if start >= len(input):
-    raiseAssert ""
-
-  let
-    length = len(input) - start # >= 1
-    prefix = input[start]
-
+  let prefix = input[start]
   if prefix <= 0x7f:
     raiseAssert "FOO1"
   elif prefix <= 0xb7:
     let strLen = int(prefix - 0x80)
-    if strLen >= length:
-      raiseAssert ""
-    if strLen == 1 and input[start + 1] <= 0x7f:
-      raiseAssert ""
-
     (1 .. start + strLen, rlpBlob)
   else:
     (2 .. 178, rlpList)
@@ -47,7 +33,7 @@ func rlpFromBytes*(data: openArray[byte]): Rlp =
   Rlp(bytes: @data, position: 0)
 
 func isList*(self: Rlp): bool =
-  self.bytes[self.position] >= LIST_START_MARKER
+  self.bytes[self.position] >= byte(0xc0)
 
 func toBytes*(self: Rlp): seq[byte] =
   @(self.bytes.view(item(self).payload))
