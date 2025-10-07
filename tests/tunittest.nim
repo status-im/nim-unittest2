@@ -184,7 +184,7 @@ suite "bug #5784":
     var obj: Obj
     check obj.isNil or obj.field == 0
 
-suite "PR #56":
+suite "PR #58":
   test "object ref field check":
     type Obj = object
       field: ref int
