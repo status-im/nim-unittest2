@@ -184,6 +184,14 @@ suite "bug #5784":
     var obj: Obj
     check obj.isNil or obj.field == 0
 
+suite "PR #56":
+  test "object ref field check":
+    type Obj = object
+      field: ref int
+    var obj = Obj(field: new(int))
+    obj.field[] = 123
+    check obj.field[] == 123
+
 type
     SomeType = object
         value: int
