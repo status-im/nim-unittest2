@@ -958,47 +958,46 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
+  bind collect, suiteStarted, suiteEnded
+
   block:
-    bind collect, suiteStarted, suiteEnded
+    template setup(setupBody: untyped) {.dirty, used.} =
+      var testSetupIMPLFlag {.used.} = true
+      template testSetupIMPL: untyped {.dirty.} = setupBody
 
-    block:
-      template setup(setupBody: untyped) {.dirty, used.} =
-        var testSetupIMPLFlag {.used.} = true
-        template testSetupIMPL: untyped {.dirty.} = setupBody
+    template teardown(teardownBody: untyped) {.dirty, used.} =
+      var testTeardownIMPLFlag {.used.} = true
+      template testTeardownIMPL: untyped {.dirty.} = teardownBody
 
-      template teardown(teardownBody: untyped) {.dirty, used.} =
-        var testTeardownIMPLFlag {.used.} = true
-        template testTeardownIMPL: untyped {.dirty.} = teardownBody
+    template suiteTeardown(suiteTeardownBody: untyped) {.dirty, used.} =
+      var testSuiteTeardownIMPLFlag {.used.} = true
+      template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
 
-      template suiteTeardown(suiteTeardownBody: untyped) {.dirty, used.} =
-        var testSuiteTeardownIMPLFlag {.used.} = true
-        template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
-
-      when nimvm:
-        discard
-      else:
-        let suiteName {.inject.} = nameParam
-        when not collect:
-          # TODO deal with suite nesting
-          if globals.currentSuite.len > 0:
-            suiteEnded()
-            globals.currentSuite.reset()
-          globals.currentSuite = suiteName
-
-          suiteStarted(suiteName)
-
-      # TODO what about exceptions in the suite itself?
-      body
-
-      when declared(testSuiteTeardownIMPLFlag):
-        testSuiteTeardownIMPL()
-
-      when nimvm:
-        discard
-      else:
-        when not collect:
+    when nimvm:
+      discard
+    else:
+      let suiteName {.inject.} = nameParam
+      when not collect:
+        # TODO deal with suite nesting
+        if globals.currentSuite.len > 0:
           suiteEnded()
           globals.currentSuite.reset()
+        globals.currentSuite = suiteName
+
+        suiteStarted(suiteName)
+
+    # TODO what about exceptions in the suite itself?
+    body
+
+    when declared(testSuiteTeardownIMPLFlag):
+      testSuiteTeardownIMPL()
+
+    when nimvm:
+      discard
+    else:
+      when not collect:
+        suiteEnded()
+        globals.currentSuite.reset()
 
 template checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
