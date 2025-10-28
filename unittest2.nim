@@ -1143,7 +1143,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
 
     globals.checkpoints = @[]
 
-    globals.testStatus
+    return globals.testStatus
 
   let
     localSuiteName =
