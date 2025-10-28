@@ -260,27 +260,28 @@ type
     suites: seq[JUnitSuite]
     currentSuite: int
 
-# TODO these globals are threadvar so as to avoid gc-safety-issues - this should
+type globalsWrap = ref object of RootObj
+  ## globalsWrap type holds (wraps) all global values to one value.
+  formatters: seq[OutputFormatter]
+  checkpoints: seq[string]
+  testsFilters: HashSet[string]
+  currentSuite: string
+  testStatus: TestStatus
+  when collect:
+    tests: OrderedTable[string, seq[Test]]
+
+# TODO these variables are threadvar so as to avoid gc-safety-issues - this should
 #      probably be resolved in a better way down the line specially since we
 #      don't support threads _really_
-
 var
+  globals {.threadvar.}: globalsWrap
+
   abortOnError* {.threadvar.}: bool
     ## Set to true in order to quit
     ## immediately on fail. Default is false,
     ## or override with `-d:nimUnittestAbortOnError:on|off`.
 
-  checkpoints {.threadvar.}: seq[string]
-  formatters {.threadvar.}: seq[OutputFormatter]
-  testsFilters {.threadvar.}: HashSet[string]
-
-  currentSuite {.threadvar.}: string
-  testStatus {.threadvar.}: TestStatus
-
-when collect:
-  var
-    tests {.threadvar.}: OrderedTable[string, seq[Test]]
-
+globals = globalsWrap()
 abortOnError = nimUnittestAbortOnError
 
 when declared(stdout):
@@ -318,44 +319,44 @@ method testRunEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
 
 when collect:
   proc suiteRunStarted(tests: OrderedTable[string, seq[Test]]) =
-    for formatter in formatters:
+    for formatter in globals.formatters:
       formatter.suiteRunStarted(tests)
 
 proc suiteStarted(name: string) =
-  for formatter in formatters:
+  for formatter in globals.formatters:
     formatter.suiteStarted(name)
 
 proc testStarted(name: string) =
-  for formatter in formatters:
+  for formatter in globals.formatters:
     formatter.testStarted(name)
 
 proc testEnded(testResult: TestResult) =
-  for formatter in formatters:
+  for formatter in globals.formatters:
     formatter.testEnded(testResult)
 
 proc suiteEnded() =
-  for formatter in formatters:
+  for formatter in globals.formatters:
     formatter.suiteEnded()
 
 when collect:
   proc suiteRunEnded() =
-    for formatter in formatters:
+    for formatter in globals.formatters:
       formatter.suiteRunEnded()
 
 proc testRunEnded() =
   when not collect:
-    if currentSuite.len > 0:
+    if globals.currentSuite.len > 0:
       suiteEnded()
-      currentSuite.reset()
+      globals.currentSuite.reset()
 
-  for formatter in formatters:
+  for formatter in globals.formatters:
     testRunEnded(formatter)
 
 proc addOutputFormatter*(formatter: OutputFormatter) =
-  formatters.add(formatter)
+  globals.formatters.add(formatter)
 
 proc resetOutputFormatters*() =
-  formatters.reset()
+  globals.formatters.reset()
 
 proc newConsoleOutputFormatter*(outputLevel: OutputLevel = outputLevelDefault,
                                 colorOutput = true): ConsoleOutputFormatter =
@@ -872,10 +873,10 @@ proc shouldRun(currentSuiteName, testName: string): bool =
   when nimvm:
     true
   else:
-    if testsFilters.len == 0:
+    if globals.testsFilters.len == 0:
       return true
 
-    for f in testsFilters:
+    for f in globals.testsFilters:
       if matchFilter(currentSuiteName, testName, f):
         return true
 
@@ -905,10 +906,10 @@ proc parseParameters*(args: openArray[string]) =
     elif str.startsWith("--verbose") or str == "-v":
       hasVerbose = true
     else:
-      testsFilters.incl(str)
+      globals.testsFilters.incl(str)
   if hasXml.len > 0:
     try:
-      formatters.add(newJUnitOutputFormatter(newFileStream(hasXml, fmWrite)))
+      globals.formatters.add(newJUnitOutputFormatter(newFileStream(hasXml, fmWrite)))
     except CatchableError as exc:
       echo "Cannot open ", hasXml, " for writing: ", exc.msg
       quit 1
@@ -917,14 +918,14 @@ proc parseParameters*(args: openArray[string]) =
     let level =
       if hasVerbose: OutputLevel.VERBOSE
       else: hasLevel
-    formatters.add(newConsoleOutputFormatter(level, defaultColorOutput()))
+    globals.formatters.add(newConsoleOutputFormatter(level, defaultColorOutput()))
 
 proc ensureInitialized() =
   if autoParseArgs and declared(paramCount):
     parseParameters(commandLineParams())
 
-  if formatters.len == 0:
-    formatters = @[OutputFormatter(defaultConsoleFormatter())]
+  if globals.formatters.len == 0:
+    globals.formatters = @[OutputFormatter(defaultConsoleFormatter())]
 
 ensureInitialized() # Run once!
 
@@ -957,46 +958,47 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind collect, currentSuite, suiteStarted, suiteEnded
-
   block:
-    template setup(setupBody: untyped) {.dirty, used.} =
-      var testSetupIMPLFlag {.used.} = true
-      template testSetupIMPL: untyped {.dirty.} = setupBody
+    bind collect, suiteStarted, suiteEnded
 
-    template teardown(teardownBody: untyped) {.dirty, used.} =
-      var testTeardownIMPLFlag {.used.} = true
-      template testTeardownIMPL: untyped {.dirty.} = teardownBody
+    block:
+      template setup(setupBody: untyped) {.dirty, used.} =
+        var testSetupIMPLFlag {.used.} = true
+        template testSetupIMPL: untyped {.dirty.} = setupBody
 
-    template suiteTeardown(suiteTeardownBody: untyped) {.dirty, used.} =
-      var testSuiteTeardownIMPLFlag {.used.} = true
-      template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
+      template teardown(teardownBody: untyped) {.dirty, used.} =
+        var testTeardownIMPLFlag {.used.} = true
+        template testTeardownIMPL: untyped {.dirty.} = teardownBody
 
-    when nimvm:
-      discard
-    else:
-      let suiteName {.inject.} = nameParam
-      when not collect:
-        # TODO deal with suite nesting
-        if currentSuite.len > 0:
+      template suiteTeardown(suiteTeardownBody: untyped) {.dirty, used.} =
+        var testSuiteTeardownIMPLFlag {.used.} = true
+        template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
+
+      when nimvm:
+        discard
+      else:
+        let suiteName {.inject.} = nameParam
+        when not collect:
+          # TODO deal with suite nesting
+          if globals.currentSuite.len > 0:
+            suiteEnded()
+            globals.currentSuite.reset()
+          globals.currentSuite = suiteName
+
+          suiteStarted(suiteName)
+
+      # TODO what about exceptions in the suite itself?
+      body
+
+      when declared(testSuiteTeardownIMPLFlag):
+        testSuiteTeardownIMPL()
+
+      when nimvm:
+        discard
+      else:
+        when not collect:
           suiteEnded()
-          currentSuite.reset()
-        currentSuite = suiteName
-
-        suiteStarted(suiteName)
-
-    # TODO what about exceptions in the suite itself?
-    body
-
-    when declared(testSuiteTeardownIMPLFlag):
-      testSuiteTeardownIMPL()
-
-    when nimvm:
-      discard
-    else:
-      when not collect:
-        suiteEnded()
-        currentSuite.reset()
+          globals.currentSuite.reset()
 
 template checkpoint*(msg: string) =
   ## Set a checkpoint identified by `msg`. Upon test failure all
@@ -1015,9 +1017,7 @@ template checkpoint*(msg: string) =
 
     echo msg
   else:
-    bind checkpoints
-
-    checkpoints.add(msg)
+    globals.checkpoints.add(msg)
     # TODO: add support for something like SCOPED_TRACE from Google Test
 
 template fail* =
@@ -1037,23 +1037,23 @@ template fail* =
     echo "Tests failed"
     quit 1
   else:
-    testStatus = TestStatus.FAILED
+    globals.testStatus = TestStatus.FAILED
 
     exitProcs.setProgramResult(1)
 
-    for formatter in formatters:
+    for formatter in globals.formatters:
       let formatter = formatter # avoid lent iterator
       when declared(stackTrace):
         when stackTrace is string:
-          formatter.failureOccurred(checkpoints, stackTrace)
+          formatter.failureOccurred(globals.checkpoints, stackTrace)
         else:
-          formatter.failureOccurred(checkpoints, "")
+          formatter.failureOccurred(globals.checkpoints, "")
       else:
-        formatter.failureOccurred(checkpoints, "")
+        formatter.failureOccurred(globals.checkpoints, "")
 
     if abortOnError: quit(1)
 
-    checkpoints.reset()
+    globals.checkpoints.reset()
 
 template skip* =
   ## Mark the test as skipped. Should be used directly
@@ -1069,21 +1069,19 @@ template skip* =
   when nimvm:
     discard
   else:
-    bind checkpoints
-
-    testStatus = TestStatus.SKIPPED
-    checkpoints = @[]
+    globals.testStatus = TestStatus.SKIPPED
+    globals.checkpoints = @[]
 
 proc runDirect(test: Test) =
   when not collect:
     # In collection mode, we implicitly create a suite based on the module name
     # and start it based on the test list but in non-collect mode, we have to
     # emulate this with this hack
-    if currentSuite != test.suiteName:
-      if currentSuite.len > 0:
+    if globals.currentSuite != test.suiteName:
+      if globals.currentSuite.len > 0:
         suiteEnded()
       suiteStarted(test.suiteName)
-      currentSuite = test.suiteName
+      globals.currentSuite = test.suiteName
 
   let startTime = getMonoTime()
   testStarted(test.testName)
@@ -1107,11 +1105,11 @@ proc runDirect(test: Test) =
 template runtimeTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but runs only at run time, no matter the `unittest2Static`
   ## setting
-  bind collect, runDirect, shouldRun, checkpoints
+  bind collect, runDirect, shouldRun
 
   proc runTest(suiteName, testName: string): TestStatus {.raises: [], gensym.} =
-    testStatus = TestStatus.OK
-    template testStatusIMPL: var TestStatus {.inject, used.} = testStatus
+    globals.testStatus = TestStatus.OK
+    template testStatusIMPL: var TestStatus {.inject, used.} = globals.testStatus
     let suiteName {.inject, used.} = suiteName
     let testName {.inject, used.} = testName
 
@@ -1144,9 +1142,9 @@ template runtimeTest*(nameParam: string, body: untyped) =
         when not unittest2ListTests:
           body
 
-    checkpoints = @[]
+    globals.checkpoints = @[]
 
-    testStatus
+    globals.testStatus
 
   let
     localSuiteName =
@@ -1165,7 +1163,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
           filename: instantiationInfo().filename
         )
     when collect:
-      tests.mgetOrPut(localSuiteName, default(seq[Test])).add(instance)
+      globals.tests.mgetOrPut(localSuiteName, default(seq[Test])).add(instance)
     else:
       runDirect(instance)
 
@@ -1483,8 +1481,8 @@ when collect:
   proc runScheduledTests() {.noconv.} =
     # Tests can be added inside tests - this is weird and only partially
     # supported
-    while tests.len > 0:
-      var tmp = move(tests)
+    while globals.tests.len > 0:
+      var tmp = move(globals.tests)
       when unittest2ListTests:
         for suiteName, suite in tmp:
           if suite.len == 0: continue
