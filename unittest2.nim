@@ -958,7 +958,7 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind collect, suiteStarted, suiteEnded
+  bind collect, suiteStarted, suiteEnded, globals
 
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
