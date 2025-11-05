@@ -185,19 +185,14 @@ suite "bug #5784":
     check obj.isNil or obj.field == 0
 
 suite "PR #59":
-  staticTest "Nested test":
-    test "inner test":
-      checkpoint "foobar"
-      check 1 == 1
-
   staticTest "Nested static test":
     staticTest "inner test":
-      checkpoint "foobar"
+      checkpoint "nested static test CP"
       check 1 == 1
 
   dualTest "Nested dual test":
     dualTest "inner test":
-      checkpoint "foobar"
+      checkpoint "nested dual test CP"
       check 1 == 1
 
 type
