@@ -1206,6 +1206,8 @@ template test*(nameParam: string, body: untyped) =
       staticTest nameParam:
         when not unittest2ListTests:
           body
+    else:
+      error "`unittest2Static` needs to be defined to run test in Nim VM"
   else:
     runtimeTest nameParam:
       when not unittest2ListTests:

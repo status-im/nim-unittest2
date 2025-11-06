@@ -194,6 +194,13 @@ suite "PR #59":
     dualTest "inner test":
       checkpoint "nested dual test CP"
       check 1 == 1
+ 
+  staticTest "Nested test":
+    template testInStatic(): untyped =
+      static:
+        test "inner test":
+          check 1 == 1
+    check(not compiles(testInStatic()))
 
 type
     SomeType = object
