@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.4">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.6">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.4"></script>
+<script type="text/javascript" src="dochack.js?v=2.2.6"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -62,19 +62,6 @@
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
       <li><a class="reference" href="#ConsoleOutputFormatter" title="ConsoleOutputFormatter = ref object of OutputFormatter
-  ## Have test results printed in color.
-  ## Default is `auto` depending on `isatty(stdout)`, or override it with
-  ## `-d:nimUnittestColor:auto|on|off`.
-  ## 
-  ## Deprecated: Setting the environment variable `NIMTEST_COLOR` to `always`
-  ## or `never` changes the default for the non-js target to true or false respectively.
-  ## Deprecated: the environment variable `NIMTEST_NO_COLOR`, when set, changes the
-  ## default to true, if `NIMTEST_COLOR` is undefined.
-  ## Set the verbosity of test results.
-  ## Default is `VERBOSE`, or override with:
-  ## `-d:nimUnittestOutputLevel:VERBOSE|FAILURES|NONE`.
-  ## 
-  ## Deprecated: the `NIMTEST_OUTPUT_LVL` environment variable is set for the non-js target.
   when collect:">ConsoleOutputFormatter</a></li>
 <li><a class="reference" href="#JUnitOutputFormatter" title="JUnitOutputFormatter = ref object of OutputFormatter">JUnitOutputFormatter</a></li>
 <li><a class="reference" href="#OutputFormatter" title="OutputFormatter = ref object of RootObj">OutputFormatter</a></li>
@@ -332,19 +319,6 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dl class="item">
     <div id="ConsoleOutputFormatter">
   <dt><pre><a href="unittest2.html#ConsoleOutputFormatter"><span class="Identifier">ConsoleOutputFormatter</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="unittest2.html#OutputFormatter"><span class="Identifier">OutputFormatter</span></a>
-  <span class="Comment">## Have test results printed in color.</span>
-  <span class="Comment">## Default is `auto` depending on `isatty(stdout)`, or override it with</span>
-  <span class="Comment">## `-d:nimUnittestColor:auto|on|off`.</span>
-  <span class="Comment">## </span>
-  <span class="Comment">## Deprecated: Setting the environment variable `NIMTEST_COLOR` to `always`</span>
-  <span class="Comment">## or `never` changes the default for the non-js target to true or false respectively.</span>
-  <span class="Comment">## Deprecated: the environment variable `NIMTEST_NO_COLOR`, when set, changes the</span>
-  <span class="Comment">## default to true, if `NIMTEST_COLOR` is undefined.</span>
-  <span class="Comment">## Set the verbosity of test results.</span>
-  <span class="Comment">## Default is `VERBOSE`, or override with:</span>
-  <span class="Comment">## `-d:nimUnittestOutputLevel:VERBOSE|FAILURES|NONE`.</span>
-  <span class="Comment">## </span>
-  <span class="Comment">## Deprecated: the `NIMTEST_OUTPUT_LVL` environment variable is set for the non-js target.</span>
   <span class="Keyword">when</span> <span class="Identifier">collect</span><span class="Other">:</span></pre></dt>
   <dd>
     
@@ -470,8 +444,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L354" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L354" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L355" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L355" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -484,8 +458,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L411" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L411" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L412" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L412" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -501,8 +475,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 </div>
 
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1397" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1397" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1404" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1404" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -516,8 +490,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L360" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L360" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L361" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L361" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -530,8 +504,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Creates a formatter that writes report to the specified stream in JUnit format. The <tt class="docutils literal"><span class="pre">stream</span></tt> is NOT closed automatically when the test are finished, because the formatter has no way to know when all tests are finished. You should invoke formatter.close() to finalize the report.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L708" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L708" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L709" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L709" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -544,8 +518,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L884" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L884" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L885" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L885" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -557,8 +531,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L357" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L357" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L358" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L358" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -578,8 +552,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L518" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L518" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L519" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L519" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -590,8 +564,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     <tt class="docutils literal"><span class="pre">stackTrace</span></tt> is provided only if the failure occurred due to an exception. <tt class="docutils literal"><span class="pre">checkpoints</span></tt> is never <tt class="docutils literal"><span class="pre">nil</span></tt>.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L738" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L738" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L739" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L739" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -602,8 +576,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     <tt class="docutils literal"><span class="pre">stackTrace</span></tt> is provided only if the failure occurred due to an exception. <tt class="docutils literal"><span class="pre">checkpoints</span></tt> is never <tt class="docutils literal"><span class="pre">nil</span></tt>.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L300" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L300" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L301" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L301" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -616,8 +590,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L613" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L613" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L614" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L614" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -627,8 +601,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L750" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L750" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L751" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L751" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -638,8 +612,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L307" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L307" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L308" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L308" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -652,8 +626,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L464" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L464" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L465" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L465" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -663,8 +637,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L731" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L731" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L732" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L732" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -674,8 +648,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L296" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L296" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L297" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L297" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -688,8 +662,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L575" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L575" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L576" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L576" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -699,8 +673,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L747" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L747" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L748" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L748" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -710,8 +684,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L305" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L305" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L306" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L306" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -724,8 +698,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L662" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L662" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L663" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L663" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -735,8 +709,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Completes the report and closes the underlying stream.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L808" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L808" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L809" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L809" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -746,8 +720,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L314" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L314" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L315" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L315" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -760,8 +734,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L492" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L492" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L493" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L493" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -771,8 +745,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L735" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L735" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L736" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L736" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -782,8 +756,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L298" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L298" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L299" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L299" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -811,8 +785,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 <span class="Identifier">check</span><span class="Punctuation">:</span>
   <span class="StringLit">&quot;AKB48&quot;</span><span class="Operator">.</span><span class="Identifier">toLowerAscii</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">==</span> <span class="StringLit">&quot;akb48&quot;</span>
   <span class="CharLit">'C'</span> <span class="Keyword">notin</span> <span class="Identifier">teams</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1225" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1225" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1232" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1232" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -836,8 +810,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 
 <span class="Identifier">expect</span> <span class="Identifier">IOError</span><span class="Punctuation">,</span> <span class="Identifier">OSError</span><span class="Punctuation">,</span> <span class="Identifier">ValueError</span><span class="Punctuation">,</span> <span class="Identifier">AssertionDefect</span><span class="Punctuation">:</span>
   <span class="Identifier">defectiveRobot</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1357" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1357" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1364" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1364" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -858,8 +832,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 <span class="Identifier">check</span><span class="Punctuation">(</span><span class="Punctuation">(</span><span class="DecNumber">42</span><span class="Punctuation">,</span> <span class="StringLit">&quot;the Answer to life and everything&quot;</span><span class="Punctuation">)</span> <span class="Operator">==</span> <span class="Punctuation">(</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="StringLit">&quot;a&quot;</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
 <span class="Identifier">checkpoint</span><span class="Punctuation">(</span><span class="StringLit">&quot;Checkpoint B&quot;</span><span class="Punctuation">)</span></pre><p>outputs &quot;Checkpoint A&quot; once it fails.</p>
 
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1001" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1001" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1002" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1002" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -871,8 +845,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Similar to <tt class="docutils literal"><span class="pre"><span class="Identifier">test</span></span></tt> but run the test both compuletime and run time, no matter the <tt class="docutils literal"><span class="pre"><span class="Identifier">unittest2Static</span></span></tt> flag
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1181" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1181" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1188" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1188" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -887,8 +861,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 <span class="Identifier">complicatedProcInThread</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 <span class="Identifier">fail</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre><p>outputs &quot;Checkpoint A&quot; before quitting.</p>
 
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1023" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1023" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1022" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1022" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -900,8 +874,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Same as <tt class="docutils literal"><span class="pre"><span class="Identifier">check</span></span></tt> except any failed test causes the program to quit immediately. Any teardown statements are not executed and the failed test output is not generated.
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1344" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1344" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1351" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1351" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -913,8 +887,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Similar to <tt class="docutils literal"><span class="pre"><span class="Identifier">test</span></span></tt> but runs only at run time, no matter the <tt class="docutils literal"><span class="pre"><span class="Identifier">unittest2Static</span></span></tt> setting
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1107" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1107" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1112" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1112" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -927,8 +901,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
     
     Mark the test as skipped. Should be used directly in case when it is not possible to perform test for reasons depending on outer environment, or certain application logic conditions or configurations. The test code is still executed.<pre class="listing"><span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">isGLContextCreated</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
   <span class="Identifier">skip</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1058" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1058" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1062" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1062" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -940,8 +914,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <dd>
     
     Similar to <tt class="docutils literal"><span class="pre"><span class="Identifier">test</span></span></tt> but runs only at compiletime, no matter the <tt class="docutils literal"><span class="pre"><span class="Identifier">unittest2Static</span></span></tt> flag
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1172" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1172" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1177" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1177" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -968,8 +942,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
 <pre class="listing"><span class="Punctuation">[</span><span class="Identifier">Suite</span><span class="Punctuation">]</span> <span class="Identifier">test</span> <span class="Identifier">suite</span> <span class="Keyword">for</span> <span class="Identifier">addition</span>
   <span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="DecNumber">2</span> <span class="Operator">+</span> <span class="DecNumber">2</span> <span class="Operator">=</span> <span class="DecNumber">4</span>
   <span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="Punctuation">(</span><span class="DecNumber">2</span> <span class="Operator">+</span> <span class="Operator">-</span><span class="DecNumber">2</span><span class="Punctuation">)</span> <span class="Operator">!=</span> <span class="DecNumber">4</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L931" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L931" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L932" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L932" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -984,8 +958,8 @@ nim c -r test 'bug #*::' '::#*'</pre>
   <span class="Keyword">let</span> <span class="Identifier">roses</span> <span class="Operator">=</span> <span class="StringLit">&quot;red&quot;</span>
   <span class="Identifier">check</span><span class="Punctuation">(</span><span class="Identifier">roses</span> <span class="Operator">==</span> <span class="StringLit">&quot;red&quot;</span><span class="Punctuation">)</span></pre><p>The above code outputs:</p>
 <pre class="listing"><span class="Punctuation">[</span><span class="Identifier">OK</span><span class="Punctuation">]</span> <span class="Identifier">roses</span> <span class="Identifier">are</span> <span class="Identifier">red</span></pre>
-    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1191" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
-<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1191" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
+    <a href="https://github.com/status-im/nim-unittest2/tree/master/unittest2.nim#L1198" class="link-seesrc" target="_blank">Source</a>&nbsp;&nbsp;
+<a href="https://github.com/status-im/nim-unittest2/edit/master/unittest2.nim#L1198" class="link-seesrc" target="_blank" >Edit</a>&nbsp;&nbsp;
 
   </dd>
 </div>
@@ -1001,7 +975,7 @@ nim c -r test 'bug #*::' '::#*'</pre>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-04-24 10:20:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-11-06 00:58:17 UTC</small>
       </div>
     </div>
   </div>
