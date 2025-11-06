@@ -184,6 +184,24 @@ suite "bug #5784":
     var obj: Obj
     check obj.isNil or obj.field == 0
 
+suite "PR #59":
+  staticTest "Nested static test":
+    staticTest "inner test":
+      checkpoint "nested static test CP"
+      check 1 == 1
+
+  dualTest "Nested dual test":
+    dualTest "inner test":
+      checkpoint "nested dual test CP"
+      check 1 == 1
+ 
+  staticTest "Test within static is not allowed":
+    template testInStatic(): untyped =
+      static:
+        test "inner test":
+          check 1 == 1
+    check(not compiles(testInStatic()))
+
 type
     SomeType = object
         value: int

@@ -1010,9 +1010,6 @@ template checkpoint*(msg: string) =
   ##
   ## outputs "Checkpoint A" once it fails.
   when nimvm:
-    when compiles(testName):
-      echo testName
-
     echo msg
   else:
     bind checkpoints
@@ -1181,12 +1178,14 @@ template staticTest*(nameParam: string, body: untyped) =
 template dualTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but run the test both compuletime and run time, no
   ## matter the `unittest2Static` flag
-  staticTest nameParam:
-    when not unittest2ListTests:
-      body
-  runtimeTest nameParam:
-    when not unittest2ListTests:
-      body
+  when nimvm:
+    staticTest nameParam:
+      when not unittest2ListTests:
+        body
+  else:
+    runtimeTest nameParam:
+      when not unittest2ListTests:
+        body
 
 template test*(nameParam: string, body: untyped) =
   ## Define a single test case identified by `name`.
@@ -1207,9 +1206,12 @@ template test*(nameParam: string, body: untyped) =
       staticTest nameParam:
         when not unittest2ListTests:
           body
-  runtimeTest nameParam:
-    when not unittest2ListTests:
-      body
+    else:
+      error "`unittest2Static` needs to be defined to run test in Nim VM"
+  else:
+    runtimeTest nameParam:
+      when not unittest2ListTests:
+        body
 
 {.pop.} # raises: []
 
