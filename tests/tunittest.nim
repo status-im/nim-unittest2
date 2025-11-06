@@ -195,7 +195,7 @@ suite "PR #59":
       checkpoint "nested dual test CP"
       check 1 == 1
  
-  staticTest "Nested test":
+  staticTest "Test within static is not allowed":
     template testInStatic(): untyped =
       static:
         test "inner test":
