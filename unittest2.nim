@@ -270,6 +270,7 @@ var
     ## immediately on fail. Default is false,
     ## or override with `-d:nimUnittestAbortOnError:on|off`.
 
+  checkpointsVm {.compileTime.}: seq[string]
   checkpoints {.threadvar.}: seq[string]
   formatters {.threadvar.}: seq[OutputFormatter]
   testsFilters {.threadvar.}: HashSet[string]
@@ -1010,10 +1011,8 @@ template checkpoint*(msg: string) =
   ##
   ## outputs "Checkpoint A" once it fails.
   when nimvm:
-    when compiles(testName):
-      echo testName
-
-    echo msg
+    {.cast(gcsafe).}:
+      checkpointsVm.add msg
   else:
     bind checkpoints
 
@@ -1035,6 +1034,11 @@ template fail* =
   ## outputs "Checkpoint A" before quitting.
   when nimvm:
     echo "Tests failed"
+    {.cast(gcsafe).}:
+      for msg in items(checkpointsVm):
+        echo("    ")
+        echo(msg)
+        echo("\n")
     quit 1
   else:
     testStatus = TestStatus.FAILED
@@ -1067,7 +1071,8 @@ template skip* =
   ##  if not isGLContextCreated():
   ##    skip()
   when nimvm:
-    discard
+    {.cast(gcsafe).}:
+      reset checkpointsVm
   else:
     bind checkpoints
 
@@ -1177,6 +1182,8 @@ template staticTest*(nameParam: string, body: untyped) =
       echo "[Test   ] ", nameParam
       body
       echo "[", TestStatus.OK, "     ] ", nameParam
+    {.cast(gcsafe).}:
+      reset checkpointsVm
 
 template dualTest*(nameParam: string, body: untyped) =
   ## Similar to `test` but run the test both compuletime and run time, no
