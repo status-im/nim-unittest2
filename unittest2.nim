@@ -161,7 +161,7 @@ const
     ## conservatively. `suite` features (`setup` etc) in particular are not
     ## supported.
   unittest2ListTests* {.booldefine.} = false
-    ## List tests at runtime (useful for test runners)
+    ## List tests at runtime without actually running them (useful for test runners)
 
 when useTerminal:
   import std/terminal
