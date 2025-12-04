@@ -1222,8 +1222,6 @@ template test*(nameParam: string, body: untyped) =
 
 iterator unittest2EvalOnceIter[T](x: T): auto =
   yield x
-iterator unittest2EvalOnceIter[T](x: var T): var T =
-  yield x
 
 template unittest2EvalOnce(name: untyped, param: typed, blk: untyped) =
   for name in unittest2EvalOnceIter(param):

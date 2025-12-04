@@ -3,3 +3,5 @@ docs/
 /nimble.develop
 *.exe
 test_results.xml
+tests/sampletests
+/build

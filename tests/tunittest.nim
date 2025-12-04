@@ -184,6 +184,28 @@ suite "bug #5784":
     var obj: Obj
     check obj.isNil or obj.field == 0
 
+suite "PR #58":
+  dualTest "object ref field check":
+    type Obj = object
+      field: ref int
+    var obj = Obj(field: new(int))
+    obj.field[] = 123
+    check obj.field[] == 123
+
+  # XXX make this work
+  #test "var params only condition":
+  when false:
+    type DisInt = distinct int
+
+    proc `==`(a, b: var DisInt): bool =
+      a.int == b.int
+
+    proc x(v: var DisInt): var DisInt = v
+
+    var a = 1.DisInt
+    var b = a
+    check x(a) == x(b)
+
 type
     SomeType = object
         value: int
