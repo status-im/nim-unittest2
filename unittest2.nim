@@ -1249,8 +1249,9 @@ macro check*(conditions: untyped): untyped =
   {.warning[Deprecated]:on.}
 
   template print(name: untyped, value: typed) =
-    when compiles($value) and typeof($value) is string:
-      checkpoint(name & " was " & $value)
+    when compiles($value):
+      when typeof($value) is string:
+        checkpoint(name & " was " & $value)
 
   proc inspectArgs(exp: NimNode): tuple[frame, inner, check, printOuts: NimNode] =
     result.check = copyNimTree(exp)

@@ -184,6 +184,24 @@ suite "bug #5784":
     var obj: Obj
     check obj.isNil or obj.field == 0
 
+suite "PR #65":
+  test "no $ defined compiles":
+    type Foo = distinct int
+    proc `==`(a, b: Foo): bool {.borrow.}
+
+    var v = Foo(1)
+    check:
+      v == Foo(1)
+
+  test "$ return non-string compiles":
+    type Foo = distinct int
+    proc `==`(a, b: Foo): bool {.borrow.}
+    proc `$`(x: Foo): Foo = x
+
+    var v = Foo(1)
+    check:
+      v == Foo(1)
+
 type
     SomeType = object
         value: int
