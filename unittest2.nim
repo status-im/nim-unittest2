@@ -1249,7 +1249,7 @@ macro check*(conditions: untyped): untyped =
   {.warning[Deprecated]:on.}
 
   template print(name: untyped, value: typed) =
-    when compiles(string($value)):
+    when compiles($value) and typeof($value) is string:
       checkpoint(name & " was " & $value)
 
   proc inspectArgs(exp: NimNode): tuple[frame, inner, check, printOuts: NimNode] =
