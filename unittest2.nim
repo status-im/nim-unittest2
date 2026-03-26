@@ -1157,7 +1157,11 @@ template runtimeTest*(nameParam: string, body: untyped) =
     localSuiteName =
       when declared(suiteName):
         suiteName
-      else: instantiationInfo().filename
+      else:
+        if currentSuite.len > 0:
+          currentSuite
+        else:
+          instantiationInfo().filename
     localTestName = nameParam
   if shouldRun(localSuiteName, localTestName):
     let
