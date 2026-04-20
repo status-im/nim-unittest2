@@ -8,106 +8,6 @@
 {.push raises: [].}
 
 ## :Authors: Zahary Karadjov, Ștefan Talpalaru, Status Research and Development
-##
-## This module makes unit testing easy.
-##
-## .. code::
-##   nim c -r testfile.nim
-##
-## exits with 0 or 1.
-##
-## Running individual tests
-## ========================
-##
-## Specify the test names as command line arguments.
-##
-## .. code::
-##
-##   nim c -r test "my test name" "another test"
-##
-## Multiple arguments can be used.
-##
-## Running a single test suite
-## ===========================
-##
-## Specify the suite name delimited by ``"::"``.
-##
-## .. code::
-##
-##   nim c -r test "my suite name::"
-##
-## Selecting tests by pattern
-## ==========================
-##
-## A single ``"*"`` can be used for globbing.
-##
-## Delimit the end of a suite name with ``"::"``.
-##
-## Tests matching **any** of the arguments are executed.
-##
-## .. code::
-##
-##   nim c -r test fast_suite::mytest1 fast_suite::mytest2
-##   nim c -r test "fast_suite::mytest*"
-##   nim c -r test "auth*::" "crypto::hashing*"
-##   # Run suites starting with 'bug #' and standalone tests starting with '#'
-##   nim c -r test 'bug #*::' '::#*'
-##
-## Command line arguments
-## ======================
-##
-## The unit test runner recognises serveral parameters that can be specified
-## either via environment or command line, the latter taking precedence.
-##
-## Several options also have defaults that can be controlled at compile-time.
-##
-## --help             Print short help and quit
-## --xml:file         Write JUnit-compatible XML report to `file`
-## --console          Write report to the console (default, when no other output
-##                    is selected)
-## --output-lvl:level Verbosity of output [COMPACT, VERBOSE, FAILURES, NONE] (env: UNITTEST2_OUTPUT_LVL)
-## --verbose, -v      Shorthand for --output-lvl:VERBOSE
-##
-## Command line parsing can be disabled with `-d:unittest2DisableParamFiltering`.
-##
-## Running tests in parallel
-## =========================
-##
-## Early versions of this library had rudimentary support for running tests in
-## parallel - this has since been removed due to safety issues in the
-## implementation and may be reintroduced at a future date.
-##
-## Example
-## -------
-##
-## .. code:: nim
-##
-##   suite "description for this stuff":
-##     echo "suite setup: run once before the tests"
-##
-##     setup:
-##       echo "run before each test"
-##
-##     teardown:
-##       echo "run after each test"
-##
-##     test "essential truths":
-##       # give up and stop if this fails
-##       require(true)
-##
-##     test "slightly less obvious stuff":
-##       # print a nasty message and move on, skipping
-##       # the remainder of this block
-##       check(1 != 1)
-##       check("asd"[2] == 'd')
-##
-##     test "out of bounds error is thrown on bad access":
-##       let v = @[1, 2, 3]  # you can do initialization here
-##       expect(IndexError):
-##         discard v[4]
-##
-##     suiteTeardown:
-##       echo "suite teardown: run once after the tests"
 
 import std/[
   macros, sequtils, sets, strutils, streams, tables, times, monotimes]
@@ -137,31 +37,43 @@ const
 
   # `unittest` compatibility
   nimUnittestOutputLevel {.strdefine.} = $outputLevelDefault
-  nimUnittestColor {.strdefine.} = "auto" ## auto|on|off
+    ## Set the default output level at compile time.
+    ## Set with `-d:nimUnittestOutputLevel=VERBOSE|COMPACT|FAILURES|NONE`.
+  nimUnittestColor {.strdefine.} = "auto"
+    ## Set the color output mode at compile time.
+    ## Set with `-d:nimUnittestColor=auto|on|off`.
   nimUnittestAbortOnError {.booldefine.} = false
+    ## Set whether to abort on first error at compile time.
+    ## Set with `-d:nimUnittestAbortOnError=true`.
 
   # `unittest2` compile-time configuration options
   unittest2DisableParamFiltering {.booldefine.} = false
     ## Disables automatic command line argument parsing - parsing is available
-    ## via the `parseParameters` function instead
+    ## via the `parseParameters` function instead.
+    ## Set with `-d:unittest2DisableParamFiltering=true`.
   unittest2Compat {.booldefine.} = true # This will be disabled in the future
     ## Compatibility mode for `unittest` for easier porting and improved
-    ## backwards compatibility - no stability guarantees
+    ## backwards compatibility - no stability guarantees.
+    ## Set with `-d:unittest2Compat=false` to disable.
   unittest2NoCollect {.booldefine.} = false
     ## Disable test collection mode where tests are enumerated before they are
     ## run - in particular, this affects the order in which tests and suites
     ## have their bodies evaluated and disables several features that require
-    ## knowing how many tests will be executed - experimental feature
+    ## knowing how many tests will be executed - experimental feature.
+    ## Set with `-d:unittest2NoCollect=true`.
   unittest2PreviewIsolate {.booldefine.} = false
     ## Preview isolation mode where each test is run in a separate process - may
-    ## be removed in the future
+    ## be removed in the future.
+    ## Set with `-d:unittest2PreviewIsolate=true`.
   unittest2Static* {.booldefine.} = false
     ## Run tests at compile time as well - only a subset of functionality is
     ## enabled at compile-time meaning that tests must be written
     ## conservatively. `suite` features (`setup` etc) in particular are not
     ## supported.
+    ## Set with `-d:unittest2Static=true`.
   unittest2ListTests* {.booldefine.} = false
-    ## List tests at runtime without actually running them (useful for test runners)
+    ## List tests at runtime without actually running them (useful for test runners).
+    ## Set with `-d:unittest2ListTests=true`.
 
 when useTerminal:
   import std/terminal
@@ -178,6 +90,7 @@ when isolate:
 
 from std/exitprocs import nil
 template addExitProc(p: proc) =
+  ## Register an exit handler and terminate with a diagnostic on failure.
   try:
     exitprocs.addExitProc(p)
   except Exception as e:
@@ -198,18 +111,27 @@ type
     SKIPPED
 
   TestResult* = object
+    ## Represents the result of a single test case execution.
     suiteName*: string
       ## Name of the test suite that contains this test case.
     testName*: string
-      ## Name of the test case
+      ## Name of the test case.
     status*: TestStatus
-    duration*: Duration # How long the test took, in seconds
+      ## Final status of the test (OK, FAILED, or SKIPPED).
+    duration*: Duration
+      ## How long the test took to execute.
     output*: string
+      ## Combined stdout/stderr output captured during the test (if supported by the execution mode).
     errors*: string
+      ## Failure diagnostics and checkpoints collected during the test.
 
   OutputFormatter* = ref object of RootObj
+    ## Base class for all test output formatters.
+    ## Custom formatters should inherit from this type and override its methods.
 
   ConsoleOutputFormatter* = ref object of OutputFormatter
+    ## A formatter that prints test results to the console with optional color
+    ## and various verbosity levels.
     colorOutput: bool
       ## Have test results printed in color.
       ## Default is `auto` depending on `isatty(stdout)`, or override it with
@@ -255,6 +177,7 @@ type
     tests: seq[JUnitTest]
 
   JUnitOutputFormatter* = ref object of OutputFormatter
+    ## A formatter that writes test results in JUnit-compatible XML format.
     stream: Stream
     defaultSuite: JUnitSuite
     suites: seq[JUnitSuite]
@@ -291,59 +214,79 @@ when declared(stdout):
 when collect:
   method suiteRunStarted*(
       formatter: OutputFormatter, tests: OrderedTable[string, seq[Test]]) {.base, gcsafe.} =
-    # Run when a round of running discovered suites starts - these may result
-    # in subsequent tests being added meaning subsequent suite runs
+    ## Called when a round of running discovered suites starts. 
+    ## This is only relevant in Collect-and-Run mode.
     discard
+
 method suiteStarted*(formatter: OutputFormatter, suiteName: string) {.base, gcsafe.} =
+  ## Called before tests from `suiteName` start running.
   discard
+
 method testStarted*(formatter: OutputFormatter, testName: string) {.base, gcsafe.} =
+  ## Called before `testName` starts running.
   discard
+
 method failureOccurred*(formatter: OutputFormatter, checkpoints: seq[string],
     stackTrace: string) {.base, gcsafe.} =
+  ## Called when a check or expectation fails, or an unhandled exception occurs.
   ## ``stackTrace`` is provided only if the failure occurred due to an exception.
-  ## ``checkpoints`` is never ``nil``.
+  ## ``checkpoints`` contains the list of checkpoints encountered before the failure.
   discard
+
 method testEnded*(formatter: OutputFormatter, testResult: TestResult) {.base, gcsafe.} =
+  ## Called when a test has finished and the final `testResult` is known.
   discard
+
 method suiteEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
+  ## Called after all tests in the current suite have finished.
   discard
+
 when collect:
   method suiteRunEnded*(
       formatter: OutputFormatter) {.base, gcsafe.} =
+    ## Called when a round of running discovered suites ends.
+    ## This is only relevant in Collect-and-Run mode.
     discard
 
 method testRunEnded*(formatter: OutputFormatter) {.base, gcsafe.} =
-  # Runs when the test executable is about to end, which is implemented using
-  # addExitProc, a best-effort kind of place to do cleanups
+  ## Called once when the full test run is about to terminate (usually via an exit proc).
   discard
+
 
 when collect:
   proc suiteRunStarted(tests: OrderedTable[string, seq[Test]]) =
+    ## Broadcast suite-run start event to all registered formatters.
     for formatter in formatters:
       formatter.suiteRunStarted(tests)
 
 proc suiteStarted(name: string) =
+  ## Broadcast suite start event to all registered formatters.
   for formatter in formatters:
     formatter.suiteStarted(name)
 
 proc testStarted(name: string) =
+  ## Broadcast test start event to all registered formatters.
   for formatter in formatters:
     formatter.testStarted(name)
 
 proc testEnded(testResult: TestResult) =
+  ## Broadcast test end event to all registered formatters.
   for formatter in formatters:
     formatter.testEnded(testResult)
 
 proc suiteEnded() =
+  ## Broadcast suite end event to all registered formatters.
   for formatter in formatters:
     formatter.suiteEnded()
 
 when collect:
   proc suiteRunEnded() =
+    ## Broadcast suite-run completion event to all registered formatters.
     for formatter in formatters:
       formatter.suiteRunEnded()
 
 proc testRunEnded() =
+  ## Finalize suite lifecycle and notify formatters that the run is complete.
   when not collect:
     if currentSuite.len > 0:
       suiteEnded()
@@ -353,19 +296,23 @@ proc testRunEnded() =
     testRunEnded(formatter)
 
 proc addOutputFormatter*(formatter: OutputFormatter) =
+  ## Add an output formatter used for all subsequent reporting events.
   formatters.add(formatter)
 
 proc resetOutputFormatters*() =
+  ## Remove all currently registered output formatters.
   formatters.reset()
 
 proc newConsoleOutputFormatter*(outputLevel: OutputLevel = outputLevelDefault,
                                 colorOutput = true): ConsoleOutputFormatter =
+  ## Create a console formatter with explicit verbosity and color settings.
   ConsoleOutputFormatter(
     outputLevel: outputLevel,
     colorOutput: colorOutput,
   )
 
 proc defaultColorOutput(): bool =
+  ## Resolve default console color behavior from compile-time and environment settings.
   let color = nimUnittestColor
   case color
   of "auto":
@@ -387,6 +334,7 @@ proc defaultColorOutput(): bool =
       result = false
 
 proc defaultOutputLevel(): OutputLevel =
+  ## Resolve output verbosity from environment and compile-time defaults.
   when declared(stdout):
     const levelEnv = "UNITTEST2_OUTPUT_LVL"
     const nimtestEnv = "NIMTEST_OUTPUT_LVL"
@@ -410,6 +358,7 @@ proc defaultOutputLevel(): OutputLevel =
       defaultLevel
 
 proc defaultConsoleFormatter*(): ConsoleOutputFormatter =
+  ## Create the default console formatter honoring current runtime settings.
   newConsoleOutputFormatter(defaultOutputLevel(), defaultColorOutput())
 
 const
@@ -417,12 +366,15 @@ const
   maxDurationLen = 6
 
 func formatStatus(status: string): string =
+  ## Render a padded status label enclosed in square brackets.
   "[" & alignLeft(status, maxStatusLen) & "]"
 
 func formatStatus(status: TestStatus): string =
+  ## Render a status enum as a padded bracketed label.
   formatStatus($status)
 
 proc formatDuration(dur: Duration, aligned = true): string =
+  ## Format a duration for human-readable test output.
   let
     seconds = dur.inMilliseconds.float / 1000.0
     precision = max(3 - ($seconds.int).len, 1)
@@ -435,6 +387,7 @@ proc formatDuration(dur: Duration, aligned = true): string =
 
 when collect:
   proc formatFraction(cur, total: int): string =
+    ## Render `cur/total` progress aligned for console output.
     let
       cur = $cur
       total = $total
@@ -442,6 +395,7 @@ when collect:
 
 template write(
     formatter: ConsoleOutputFormatter, styled: untyped, unstyled: untyped) =
+  ## Write to stdout with optional styling while suppressing terminal I/O exceptions.
   template ignoreExceptions(body: untyped) =
     # We ignore exceptions throughout assuming there's no way to
     try: body except CatchableError: discard
@@ -455,11 +409,13 @@ template write(
 when collect:
   method suiteRunStarted*(
       formatter: ConsoleOutputFormatter, tests: OrderedTable[string, seq[Test]]) =
+    ## Initialize suite counters for a collect-mode run.
     for k, v in tests:
       formatter.tests[k] = v.len
 
 when collect:
   method suiteRunEnded*(formatter: ConsoleOutputFormatter) =
+    ## Clear collect-mode bookkeeping at the end of a suite run.
     formatter.tests.reset()
 
 method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
@@ -485,6 +441,7 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
   stdout.flushFile()
 
 proc writeTestName(formatter: ConsoleOutputFormatter, testName: string) =
+  ## Write a test name using formatter color settings.
   formatter.write do:
     stdout.styledWrite fgBlue, testName
   do:
@@ -527,17 +484,20 @@ method failureOccurred*(formatter: ConsoleOutputFormatter,
     formatter.errors.add("\n")
 
 proc color(status: TestStatus): ForegroundColor =
+  ## Map a `TestStatus` to a console foreground color.
   case status
   of TestStatus.OK: fgGreen
   of TestStatus.FAILED: fgRed
   of TestStatus.SKIPPED: fgYellow
 proc marker(status: TestStatus): string =
+  ## Map a `TestStatus` to compact progress marker text.
   case status
   of TestStatus.OK: "."
   of TestStatus.FAILED: "F"
   of TestStatus.SKIPPED: "s"
 
 proc getAppFilename2(): string =
+  ## Best-effort wrapper for obtaining the executable path.
   # TODO https://github.com/nim-lang/Nim/pull/22544
   try:
     getAppFilename()
@@ -545,6 +505,7 @@ proc getAppFilename2(): string =
     ""
 
 proc printFailureInfo(formatter: ConsoleOutputFormatter, testResult: TestResult) =
+  ## Print rerun hint, test output, and failure diagnostics for one failing test.
   # Show how to re-run this test case
   echo repeat('=', testResult.testName.len)
   echo "  ", getAppFilename2(), " ", quoteShell(testResult.suiteName & "::" & testResult.testName)
@@ -557,6 +518,7 @@ proc printFailureInfo(formatter: ConsoleOutputFormatter, testResult: TestResult)
     echo testResult.errors
 
 proc printTestResultStatus(formatter: ConsoleOutputFormatter, testResult: TestResult) =
+  ## Print a single test result line including status and duration.
   let
     status = formatStatus(testResult.status)
     duration = formatDuration(testResult.duration)
@@ -692,6 +654,7 @@ method testRunEnded*(formatter: ConsoleOutputFormatter) =
     formatter.printTestResultStatus(testResult)
 
 proc xmlEscape(s: string): string =
+  ## Escape a string for use in XML attributes and text nodes.
   result = newStringOfCap(s.len)
   for c in items(s):
     case c:
@@ -724,6 +687,7 @@ proc newJUnitOutputFormatter*(stream: Stream): JUnitOutputFormatter =
     quit 1
 
 template suite(formatter: JUnitOutputFormatter): untyped =
+  ## Return the active JUnit suite, falling back to the default suite.
   if formatter.currentSuite == -1:
     addr formatter.defaultSuite
   else:
@@ -752,9 +716,11 @@ method suiteEnded*(formatter: JUnitOutputFormatter) =
   formatter.currentSuite = -1
 
 func toFloatSeconds(duration: Duration): float64 =
+  ## Convert a `Duration` to fractional seconds.
   duration.inNanoseconds().float64 / 1_000_000_000.0
 
 proc writeTest(s: Stream, test: JUnitTest) {.raises: [CatchableError].} =
+  ## Serialize a single JUnit testcase element.
   let
     time = test.result.duration.toFloatSeconds()
     timeStr = time.formatFloat(ffDecimal, precision = 6)
@@ -778,6 +744,7 @@ proc writeTest(s: Stream, test: JUnitTest) {.raises: [CatchableError].} =
   s.writeLine("\t\t</testcase>")
 
 proc countTests(counts: var (int, int, int, int, float), suite: JUnitSuite) =
+  ## Aggregate tests, failures, errors, skipped and elapsed time for one suite.
   counts[0] += suite.tests.len()
   for test in suite.tests:
     counts[4] += test.result.duration.toFloatSeconds()
@@ -793,6 +760,7 @@ proc countTests(counts: var (int, int, int, int, float), suite: JUnitSuite) =
         counts[1] += 1
 
 proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [CatchableError].} =
+  ## Serialize one JUnit testsuite and all contained testcases.
   var counts: (int, int, int, int, float)
   countTests(counts, suite)
 
@@ -831,7 +799,9 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
     {.warning[BareExcept]:on.}
 
 proc glob(matcher, filter: string): bool =
-  ## Globbing using a single `*`. Empty `filter` matches everything.
+  ## Globbing using exactly one `*`. Empty `filter` matches everything.
+  ## Multiple asterisks are not supported and the second `*` will be treated
+  ## as a literal character.
   if filter.len == 0:
     return true
 
@@ -850,6 +820,7 @@ proc glob(matcher, filter: string): bool =
       beforeAndAfter[1])
 
 proc matchFilter(suiteName, testName, filter: string): bool =
+  ## Match a `suiteName::testName` pair against a single filter expression.
   if filter == "":
     return true
   if testName == filter:
@@ -883,6 +854,10 @@ proc shouldRun(currentSuiteName, testName: string): bool =
     return false
 
 proc parseParameters*(args: openArray[string]) =
+  ## Parse unittest2 CLI options and test filters from `args`.
+  ##
+  ## Recognized options include `--help`, `--xml`, `--console`,
+  ## `--output-level`, and `--verbose`/`-v`.
   var
     hasConsole = false
     hasXml: string
@@ -921,6 +896,7 @@ proc parseParameters*(args: openArray[string]) =
     formatters.add(newConsoleOutputFormatter(level, defaultColorOutput()))
 
 proc ensureInitialized() =
+  ## Lazily initialize formatters and optionally parse process parameters.
   if autoParseArgs and declared(paramCount):
     parseParameters(commandLineParams())
 
@@ -1080,6 +1056,7 @@ template skip* =
     checkpoints = @[]
 
 proc runDirect(test: Test) =
+  ## Execute a test instance immediately and report its result.
   when not collect:
     # In collection mode, we implicitly create a suite based on the module name
     # and start it based on the test list but in non-collect mode, we have to
@@ -1110,8 +1087,9 @@ proc runDirect(test: Test) =
   ))
 
 template runtimeTest*(nameParam: string, body: untyped) =
-  ## Similar to `test` but runs only at run time, no matter the `unittest2Static`
-  ## setting
+  ## Define a test case that runs only at runtime.
+  ## This is useful for tests that require OS features, I/O, or other 
+  ## functionality not available in the Nim VM.
   bind collect, runDirect, shouldRun, checkpoints
 
   proc runTest(suiteName, testName: string): TestStatus {.raises: [], gensym.} =
@@ -1175,8 +1153,9 @@ template runtimeTest*(nameParam: string, body: untyped) =
       runDirect(instance)
 
 template staticTest*(nameParam: string, body: untyped) =
-  ## Similar to `test` but runs only at compiletime, no matter the
-  ## `unittest2Static` flag
+  ## Define a test case that runs only at compile-time in the Nim VM.
+  ## This is useful for verifying logic, constant folding, and 
+  ## type-level transformations during compilation.
   static:
     block:
       echo "[Test   ] ", nameParam
@@ -1186,8 +1165,8 @@ template staticTest*(nameParam: string, body: untyped) =
       reset checkpointsVm
 
 template dualTest*(nameParam: string, body: untyped) =
-  ## Similar to `test` but run the test both compuletime and run time, no
-  ## matter the `unittest2Static` flag
+  ## Define a test case that runs both at compile-time and runtime.
+  ## This ensures that your code behaves consistently in both environments.
   staticTest nameParam:
     when not unittest2ListTests:
       body
@@ -1221,11 +1200,14 @@ template test*(nameParam: string, body: untyped) =
 {.pop.} # raises: []
 
 iterator unittest2EvalOnceIter[T](x: T): auto =
+  ## Helper iterator used by `check` to avoid evaluating expressions twice.
   yield x
 iterator unittest2EvalOnceIter[T](x: var T): var T =
+  ## Mutable variant of `unittest2EvalOnceIter`.
   yield x
 
 template unittest2EvalOnce(name: untyped, param: typed, blk: untyped) =
+  ## Bind `param` once and execute `blk` with the bound value.
   for name in unittest2EvalOnceIter(param):
     blk
 
@@ -1404,11 +1386,13 @@ macro expect*(exceptions: varargs[typed], body: untyped): untyped =
 
 proc disableParamFiltering* {.deprecated:
     "Compile with -d:unittest2DisableParamFiltering instead".} =
+  ## Deprecated runtime switch kept for source compatibility.
   discard
 
 when unittest2PreviewIsolate:
   import std/[osproc, strtabs]
   proc runIsolated(test: Test) =
+    ## Run one test in a child process and capture combined output.
     # Run test in an isolated process - this has the advantage that we can
     # trivially capture stdout but has a number of problems:
     # * suite and other global stuff gets executed for each test
@@ -1489,6 +1473,7 @@ when unittest2PreviewIsolate:
 
 when collect:
   proc runScheduledTests() {.noconv.} =
+    ## Execute discovered tests, optionally listing them instead of running.
     # Tests can be added inside tests - this is weird and only partially
     # supported
     while tests.len > 0:
