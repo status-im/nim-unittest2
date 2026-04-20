@@ -45,5 +45,12 @@ task test, "Run tests":
 
   testOptions()
 
-task buildDocs, "Build docs":
-  exec "nim doc --skipParentCfg:on --skipUserCfg:on --outdir:docs --git.url:https://github.com/status-im/nim-unittest2 --git.commit:master --git.devel:master unittest2.nim"
+task book, "Generate book":
+  exec "mdbook build book -d ../docs"
+
+task apidocs, "Generate API docs":
+  exec "nimble doc --outdir:docs/apidocs --project --index:on --git.url:https://github.com/status-im/nim-unittest2 --git.commit:master --git.devel:master unittest2.nim"
+
+task docs, "Generate docs":
+  selfExec "book"
+  selfExec "apidocs"
