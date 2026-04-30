@@ -61,12 +61,15 @@
 ##
 ## Several options also have defaults that can be controlled at compile-time.
 ##
-## --help             Print short help and quit
-## --xml:file         Write JUnit-compatible XML report to `file`
-## --console          Write report to the console (default, when no other output
-##                    is selected)
-## --output-lvl:level Verbosity of output [COMPACT, VERBOSE, FAILURES, NONE] (env: UNITTEST2_OUTPUT_LVL)
-## --verbose, -v      Shorthand for --output-lvl:VERBOSE
+## --help                    Print short help and quit
+## --xml:file                Write JUnit-compatible XML report to `file`
+## --console                 Write report to the console (default, when no other output
+##                           is selected)
+## --output-lvl:level        Verbosity of output [COMPACT, VERBOSE, FAILURES, NONE] (env: UNITTEST2_OUTPUT_LVL)
+## --verbose, -v             Shorthand for --output-lvl:VERBOSE
+##
+## Expected failures for both static and runtime tests are configured with
+## `-d:unittest2ExpectedFailures=...`. Multiple filters are separated with `;`.
 ##
 ## Command line parsing can be disabled with `-d:unittest2DisableParamFiltering`.
 ##
@@ -110,7 +113,7 @@
 ##       echo "suite teardown: run once after the tests"
 
 import std/[
-  macros, sequtils, sets, strutils, streams, tables, times, monotimes]
+  macros, sequtils, strutils, streams, tables, times, monotimes]
 
 when defined(nimHasWarnBareExcept):
   # In unit tests, we want to at least attempt to catch Exception no matter its
@@ -160,6 +163,9 @@ const
     ## enabled at compile-time meaning that tests must be written
     ## conservatively. `suite` features (`setup` etc) in particular are not
     ## supported.
+  unittest2ExpectedFailures* {.strdefine.} = ""
+    ## Semicolon-separated expected-failure filters configured at compile time,
+    ## for both static tests and runtime defaults.
   unittest2ListTests* {.booldefine.} = false
     ## List tests at runtime without actually running them (useful for test runners)
 
@@ -195,7 +201,9 @@ type
   TestStatus* = enum ## The status of a test when it is done.
     OK,
     FAILED,
-    SKIPPED
+    SKIPPED,
+    XFAIL,
+    XPASS
 
   TestResult* = object
     suiteName*: string
@@ -271,9 +279,12 @@ var
     ## or override with `-d:nimUnittestAbortOnError:on|off`.
 
   checkpointsVm {.compileTime.}: seq[string]
+  testStatusVm {.compileTime.}: TestStatus
   checkpoints {.threadvar.}: seq[string]
   formatters {.threadvar.}: seq[OutputFormatter]
-  testsFilters {.threadvar.}: HashSet[string]
+  testsFilters {.threadvar.}: seq[string]
+  currentTestExpectedFailure {.threadvar.}: bool
+  finalStatuses {.threadvar.}: array[TestStatus, int]
 
   currentSuite {.threadvar.}: string
   testStatus {.threadvar.}: TestStatus
@@ -331,6 +342,11 @@ proc testStarted(name: string) =
     formatter.testStarted(name)
 
 proc testEnded(testResult: TestResult) =
+  finalStatuses[testResult.status] += 1
+  let hasFatalStatus =
+    finalStatuses[TestStatus.FAILED] > 0 or
+    finalStatuses[TestStatus.XPASS] > 0
+  exitProcs.setProgramResult(if hasFatalStatus: 1 else: 0)
   for formatter in formatters:
     formatter.testEnded(testResult)
 
@@ -531,11 +547,15 @@ proc color(status: TestStatus): ForegroundColor =
   of TestStatus.OK: fgGreen
   of TestStatus.FAILED: fgRed
   of TestStatus.SKIPPED: fgYellow
+  of TestStatus.XFAIL: fgCyan
+  of TestStatus.XPASS: fgMagenta
 proc marker(status: TestStatus): string =
   case status
   of TestStatus.OK: "."
   of TestStatus.FAILED: "F"
   of TestStatus.SKIPPED: "s"
+  of TestStatus.XFAIL: "x"
+  of TestStatus.XPASS: "P"
 
 proc getAppFilename2(): string =
   # TODO https://github.com/nim-lang/Nim/pull/22544
@@ -585,14 +605,16 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
 
   formatter.results.add(testResult)
 
-  if formatter.outputLevel == VERBOSE and testResult.status == TestStatus.FAILED:
+  if formatter.outputLevel == VERBOSE and
+      testResult.status in {TestStatus.FAILED, TestStatus.XFAIL, TestStatus.XPASS}:
     # We'll print it again when all tests have completed
     formatter.failures.add testResult
 
   if formatter.outputLevel in {VERBOSE, FAILURES}:
-    if testResult.status == TestStatus.FAILED:
+    if testResult.status in {TestStatus.FAILED, TestStatus.XFAIL}:
       printFailureInfo(formatter, testResult)
-    if formatter.outputLevel == VERBOSE or testResult.status == TestStatus.FAILED:
+    if formatter.outputLevel == VERBOSE or
+        testResult.status in {TestStatus.FAILED, TestStatus.XFAIL, TestStatus.XPASS}:
       printTestResultStatus(formatter, testResult)
   else:
     # In compact mode, we use a small marker to mark progress within the suite -
@@ -640,9 +662,10 @@ method suiteEnded*(formatter: ConsoleOutputFormatter) =
   var failed = false
   if formatter.outputLevel notin {VERBOSE, FAILURES}:
     for testResult in formatter.results:
-      if testResult.status == TestStatus.FAILED:
+      if testResult.status in {TestStatus.FAILED, TestStatus.XFAIL, TestStatus.XPASS}:
         failed = true
-        formatter.printFailureInfo(testResult)
+        if testResult.status in {TestStatus.FAILED, TestStatus.XFAIL}:
+          formatter.printFailureInfo(testResult)
         formatter.printTestResultStatus(testResult)
         echo ""
 
@@ -774,6 +797,10 @@ proc writeTest(s: Stream, test: JUnitTest) {.raises: [CatchableError].} =
     for failure in test.failures:
       s.writeLine("\t\t\t<failure message=\"$#\">$#</failure>" %
           [xmlEscape(failure[^1]), xmlEscape(join(failure[0..^2], "\n"))])
+  of TestStatus.XFAIL:
+    s.writeLine("\t\t\t<skipped message=\"expected failure\" />")
+  of TestStatus.XPASS:
+    s.writeLine("\t\t\t<failure message=\"unexpected pass\">Test passed but was expected to fail.</failure>")
 
   s.writeLine("\t\t</testcase>")
 
@@ -784,13 +811,15 @@ proc countTests(counts: var (int, int, int, int, float), suite: JUnitSuite) =
     case test.result.status
     of TestStatus.OK:
       discard
-    of TestStatus.SKIPPED:
+    of TestStatus.SKIPPED, TestStatus.XFAIL:
       counts[3] += 1
     of TestStatus.FAILED:
       if test.error[0].len > 0:
         counts[2] += 1
       else:
         counts[1] += 1
+    of TestStatus.XPASS:
+      counts[1] += 1
 
 proc writeSuite(s: Stream, suite: JUnitSuite) {.raises: [CatchableError].} =
   var counts: (int, int, int, int, float)
@@ -867,6 +896,18 @@ proc matchFilter(suiteName, testName, filter: string): bool =
 
 when defined(testing): export matchFilter
 
+proc parseFiltersList(filters: string): seq[string] =
+  for filter in filters.split(';'):
+    let filter = filter.strip()
+    if filter.len > 0:
+      result.add(filter)
+
+proc matchesFilters(
+    filters: openArray[string], currentSuiteName, testName: string): bool =
+  for f in filters:
+    if matchFilter(currentSuiteName, testName, f):
+      return true
+
 proc shouldRun(currentSuiteName, testName: string): bool =
   ## Check if a test should be run by matching suiteName and testName against
   ## test filters.
@@ -876,11 +917,23 @@ proc shouldRun(currentSuiteName, testName: string): bool =
     if testsFilters.len == 0:
       return true
 
-    for f in testsFilters:
-      if matchFilter(currentSuiteName, testName, f):
-        return true
+    matchesFilters(testsFilters, currentSuiteName, testName)
 
-    return false
+proc shouldExpectFailure(currentSuiteName, testName: string): bool =
+  matchesFilters(parseFiltersList(unittest2ExpectedFailures), currentSuiteName, testName)
+
+proc classifyTestStatus(
+    currentSuiteName, testName: string, status: TestStatus): TestStatus =
+  if shouldExpectFailure(currentSuiteName, testName):
+    case status
+    of TestStatus.OK:
+      TestStatus.XPASS
+    of TestStatus.FAILED:
+      TestStatus.XFAIL
+    else:
+      status
+  else:
+    status
 
 proc parseParameters*(args: openArray[string]) =
   var
@@ -906,7 +959,7 @@ proc parseParameters*(args: openArray[string]) =
     elif str.startsWith("--verbose") or str == "-v":
       hasVerbose = true
     else:
-      testsFilters.incl(str)
+      testsFilters.add(str)
   if hasXml.len > 0:
     try:
       formatters.add(newJUnitOutputFormatter(newFileStream(hasXml, fmWrite)))
@@ -973,10 +1026,10 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
       var testSuiteTeardownIMPLFlag {.used.} = true
       template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
 
+    template suiteName: untyped {.inject, used.} = nameParam
     when nimvm:
       discard
     else:
-      let suiteName {.inject.} = nameParam
       when not collect:
         # TODO deal with suite nesting
         if currentSuite.len > 0:
@@ -1033,13 +1086,7 @@ template fail* =
   ##
   ## outputs "Checkpoint A" before quitting.
   when nimvm:
-    echo "Tests failed"
-    {.cast(gcsafe).}:
-      for msg in items(checkpointsVm):
-        echo("    ")
-        echo(msg)
-        echo("\n")
-    quit 1
+    testStatusVm = TestStatus.FAILED
   else:
     testStatus = TestStatus.FAILED
 
@@ -1055,7 +1102,7 @@ template fail* =
       else:
         formatter.failureOccurred(checkpoints, "")
 
-    if abortOnError: quit(1)
+    if abortOnError and not currentTestExpectedFailure: quit(1)
 
     checkpoints.reset()
 
@@ -1071,6 +1118,7 @@ template skip* =
   ##  if not isGLContextCreated():
   ##    skip()
   when nimvm:
+    testStatusVm = TestStatus.SKIPPED
     {.cast(gcsafe).}:
       reset checkpointsVm
   else:
@@ -1092,6 +1140,7 @@ proc runDirect(test: Test) =
 
   let startTime = getMonoTime()
   testStarted(test.testName)
+  currentTestExpectedFailure = shouldExpectFailure(test.suiteName, test.testName)
 
   # TODO this annotation works around a limitation where we know that we only
   #      call the callback from the main thread but the compiler doesn't -
@@ -1101,11 +1150,14 @@ proc runDirect(test: Test) =
     let
       status = test.impl(test.suiteName, test.testName)
       duration = getMonoTime() - startTime
+      classifiedStatus = classifyTestStatus(test.suiteName, test.testName, status)
+
+  currentTestExpectedFailure = false
 
   testEnded(TestResult(
     suiteName: test.suiteName,
     testName: test.testName,
-    status: status,
+    status: classifiedStatus,
     duration: duration
   ))
 
@@ -1183,9 +1235,27 @@ template staticTest*(nameParam: string, body: untyped) =
   ## `unittest2Static` flag
   static:
     block:
+      let
+        localSuiteName =
+          when declared(suiteName):
+            suiteName
+          else:
+            instantiationInfo().filename
+        localTestName = nameParam
+      testStatusVm = TestStatus.OK
       echo "[Test   ] ", nameParam
       body
-      echo "[", TestStatus.OK, "     ] ", nameParam
+      let classifiedStatus = classifyTestStatus(localSuiteName, localTestName, testStatusVm)
+      if testStatusVm == TestStatus.FAILED:
+        echo "Tests failed"
+        {.cast(gcsafe).}:
+          for msg in items(checkpointsVm):
+            echo("    ")
+            echo(msg)
+            echo("\n")
+      echo formatStatus(classifiedStatus), " ", nameParam
+      if classifiedStatus in {TestStatus.FAILED, TestStatus.XPASS}:
+        quit 1
     {.cast(gcsafe).}:
       reset checkpointsVm
 

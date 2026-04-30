@@ -22,7 +22,7 @@ discard """
 
 import ../unittest2, sequtils
 from std/exitprocs import nil
-import std/[osproc, strutils]
+import std/[os, osproc, strutils]
 
 #------------------------------------------------------------------------------
 # Tests using backdoors
@@ -286,3 +286,105 @@ suite "list tests":
     check count(output, "Test:") == 16
     check count(output, "File:") == 16
     check count(output, "Hello") == 0
+
+suite "expected failures":
+  test "cfg-defined expected failures apply to runtime tests":
+    # expected failure filter comes from expectedfailcmd.nim.cfg
+    let
+      command = "nim r -d:expectedFailureHarness tests/expectedfailcmd.nim known-failure"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+    check output.contains("known-failure")
+
+  test "suite-qualified filter marks matching test as expected failure":
+    let
+      command = "nim r -d:expectedFailureHarness '-d:unittest2ExpectedFailures=xfail-suite::known-failure' tests/expectedfailcmd.nim known-failure"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+    check output.contains("known-failure")
+    check output.contains("1 XFAIL")
+
+  test "bare test name filter marks matching test as expected failure":
+    let
+      command = "nim r -d:expectedFailureHarness '-d:unittest2ExpectedFailures=known-failure' tests/expectedfailcmd.nim known-failure"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+    check output.contains("known-failure")
+    check output.contains("1 XFAIL")
+
+  test "glob filter marks matching test as expected failure":
+    let
+      command = "nim r -d:expectedFailureHarness '-d:unittest2ExpectedFailures=*failure' tests/expectedfailcmd.nim ordinary-failure"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+    check output.contains("ordinary-failure")
+
+  test "unexpected passes fail the run":
+    let
+      command = "nim r -d:expectedFailureHarness '-d:unittest2ExpectedFailures=unexpected-pass' tests/expectedfailcmd.nim unexpected-pass"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 1
+    check output.contains("XPASS")
+    check output.contains("unexpected-pass")
+    check output.contains("1 XPASS")
+
+  test "expected failure filter only affects matched tests":
+    # wildcard matches all in suite; only ordinary-failure is selected to run
+    let
+      command = "nim r -d:expectedFailureHarness '-d:unittest2ExpectedFailures=*' tests/expectedfailcmd.nim ordinary-failure"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+    check output.contains("ordinary-failure")
+    check not output.contains("ordinary-pass")
+
+  test "expected failures are emitted as skipped JUnit cases":
+    let
+      xmlFile = "build/expected_failure_results.xml"
+    if fileExists(xmlFile):
+      removeFile(xmlFile)
+
+    let
+      command = "nim r -d:expectedFailureHarness '-d:unittest2ExpectedFailures=known-failure' tests/expectedfailcmd.nim --xml:" & xmlFile & " known-failure"
+      (_, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check fileExists(xmlFile)
+    check readFile(xmlFile).contains("""<skipped message="expected failure" />""")
+    removeFile(xmlFile)
+
+  test "static expected failures from compile-time flag do not fail compilation":
+    let
+      command = "nim c -d:expectedFailureHarness -d:unittest2Static '-d:unittest2ExpectedFailures=known-failure' tests/expectedfailstatic.nim"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+    check output.contains("known-failure")
+
+  test "static glob filter marks matching static tests as expected failures":
+    let
+      command = "nim c -d:expectedFailureHarness -d:unittest2Static '-d:unittest2ExpectedFailures=*failure' tests/expectedfailstatic.nim"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 0
+    check output.contains("XFAIL")
+
+  test "static unexpected passes fail compilation":
+    let
+      command = "nim c -d:expectedFailureHarness -d:unittest2Static '-d:unittest2ExpectedFailures=unexpected-pass' tests/expectedfailstatic.nim"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 1
+    check output.contains("XPASS")
+    check output.contains("unexpected-pass")

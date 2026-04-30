@@ -4,11 +4,11 @@
 
 Features of `unittest2` include:
 
-* Beautiful and compact user experience adapted for both humans and CI
-* Test separation with each test running in its own procedure
-* Strict exception handling with support for [exception tracking](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking)
-* JUnit-compatible XML test reports for tooling integration
-* Two-phase execution model as building block for advanced test scheduling and reporting features
+- Beautiful and compact user experience adapted for both humans and CI
+- Test separation with each test running in its own procedure
+- Strict exception handling with support for [exception tracking](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking)
+- JUnit-compatible XML test reports for tooling integration
+- Two-phase execution model as building block for advanced test scheduling and reporting features
 
 `unittest2` is an evolution of the [unittest](https://nim-lang.org/docs/unittest.html) module in Nim - porting, while not trivial should at least be easy.
 
@@ -50,7 +50,44 @@ The generated tests have a few command line options that can be viewed with `--h
 nim c -r test.nim --help
 ```
 
+Test selection arguments support exact names, `suite::test`, `suite::`, and single-`*`
+globs.
+
 See the [tests](./tests) for more examples!
+
+## Expected Failures
+
+Tests can be marked as expected to fail using the compile-time define
+`-d:unittest2ExpectedFailures=<filters>`. A failing test that matches a filter
+is reported as `XFAIL` (expected failure) and does not fail the test run. A
+passing test that matches a filter is reported as `XPASS` (unexpected pass) and
+fails the test run — a signal that the fix has landed and the filter should be
+removed.
+
+Filters follow the same syntax as test selection: exact test name, `suite::test`,
+`suite::`, or `*` globs. Multiple filters are separated by `;`. Quote the whole
+value when needed by your shell:
+
+```sh
+nim r '-d:unittest2ExpectedFailures=known-failure;flaky-suite::*;*wip*' test.nim
+```
+
+### Using config files
+
+Because `-d:` flags are compile-time defines, expected failures can be set
+persistently in a Nim config file — no need to modify source code or remember
+shell flags. Create a file named after your test file with a `.cfg` extension:
+
+```ini
+# mytest.nim.cfg
+--define:unittest2ExpectedFailures="known-failure;flaky-suite::unstable-test;*wip*"
+```
+
+Running `nim r mytest.nim` will automatically pick up `mytest.nim.cfg` and
+apply the filters on every run.
+
+To apply expected failures to all test files in a directory, add the define to
+`nim.cfg` in that directory instead.
 
 ## Operation
 
@@ -62,23 +99,23 @@ In "collect" mode a two-phase runner is used, first making a discovery pass to c
 
 The two-phase "collect" mode runs into a few notable incompatibilites with respect to the traditional `unittest` model:
 
-* globals and code inside `suite` but not part of `setup`, `test` etc runs for all modules before tests are run
-  * this change in execution order may result in test failures and odd performance quirks
-* when re-running tests with filters, the globals end up being processed before filtering - this problem affects `unittest` also
-* running with process isolation may lead to surprises such as resource conflicts (sockets, databases, files ..) and poor performance as both the "collection" process and the execution process ends up running the same global section of the code
+- globals and code inside `suite` but not part of `setup`, `test` etc runs for all modules before tests are run
+  - this change in execution order may result in test failures and odd performance quirks
+- when re-running tests with filters, the globals end up being processed before filtering - this problem affects `unittest` also
+- running with process isolation may lead to surprises such as resource conflicts (sockets, databases, files ..) and poor performance as both the "collection" process and the execution process ends up running the same global section of the code
 
 Porting code to the two-phase mode includes:
 
-* moving code in `suite` into `setup`, `teardown` and similar locations
-* removing order-dependency from tests ensuring that each test can be run independently
+- moving code in `suite` into `setup`, `teardown` and similar locations
+- removing order-dependency from tests ensuring that each test can be run independently
 
 The two-phase mode will at some point become the default execution model for `unittest2` - it is enabled when the compatibility mode is turned off by passing `-d:unittest2Compat=false` to the compilation process.
 
 ## Porting code from `unittest`
 
-* Replace `import unittest` with `import unittest2`
-* `unittest2` places each test in a separate `proc` which changes the way templates inside tests are interpreted - some code changes may be necessary
-* prepare the code for two-phase operation by reducing reliance on globals and test execution order
+- Replace `import unittest` with `import unittest2`
+- `unittest2` places each test in a separate `proc` which changes the way templates inside tests are interpreted - some code changes may be necessary
+- prepare the code for two-phase operation by reducing reliance on globals and test execution order
 
 ## Testing `unittest2`
 
