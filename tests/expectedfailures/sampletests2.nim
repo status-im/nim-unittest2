@@ -2,16 +2,13 @@ import ../../unittest2
 
 suite "Sample tests":
   test "Failing test 1":
-    let x = 123
-    check x == 456
+    check 1 == 0
 
   test "Failing test 2":
-    let x = 789
-    check x == 999
+    check 0 == 1
 
   test "Passing test":
-    let x = 123
-    check x == 123
+    check 1 == 1
 
   test "Skipped test":
     skip()
