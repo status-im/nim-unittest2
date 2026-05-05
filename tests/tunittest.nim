@@ -328,7 +328,6 @@ suite "expected failures":
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
-      checkpoint output
 
       check exitCode == 0
 
