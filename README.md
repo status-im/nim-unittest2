@@ -83,6 +83,15 @@ shell flags. Create a file named after your test file with a `.cfg` extension:
 --define:unittest2ExpectedFailures="known-failure;flaky-suite::unstable-test;*wip*"
 ```
 
+Or use a NimScript config:
+
+```ini
+# mytest.nims
+switch("define", "unittest2ExpectedFailures=known-failure;flaky-suite::unstable-test;*wip*")
+```
+
+_Note that you don't need quotes around `unittest2ExpectedFailures` value in .nims file._
+
 Running `nim r mytest.nim` will automatically pick up `mytest.nim.cfg` and
 apply the filters on every run.
 
