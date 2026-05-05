@@ -1,0 +1,1 @@
+switch("define", "unittest2ExpectedFailures=Failing test 1;Sample tests::Failing test 2")
