@@ -287,7 +287,7 @@ suite "list tests":
     check count(output, "File:") == 16
     check count(output, "Hello") == 0
 
-suite "expected failures, runtime tests":
+suite "expected failures":
   test "expected failures defined in config file should pass, runtime tests":
     let testFiles = ["sampletests1.nim", "sampletests2.nim"]
 
