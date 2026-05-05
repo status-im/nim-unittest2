@@ -324,7 +324,7 @@ suite "expected failures":
 
     for testSpec in testSpecs:
       let
-        command = "nim r -d:unittest2ExpectedFailures='$#' tests/expectedfailures/sampletests3.nim" % [testSpec]
+        command = "nim r -d:unittest2ExpectedFailures=\"$#\" tests/expectedfailures/sampletests3.nim" % [testSpec]
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
@@ -340,7 +340,7 @@ suite "expected failures":
 
     for testSpec in testSpecs:
       let
-        command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures='$#' tests/expectedfailures/sampletests3.nim" % [testSpec]
+        command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures=\"$#\" tests/expectedfailures/sampletests3.nim" % [testSpec]
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
@@ -351,7 +351,7 @@ suite "expected failures":
 
   test "unexpected pass defined with a flag should fail, runtime tests":
     let
-      command = "nim r -d:unittest2ExpectedFailures='Passing test' tests/expectedfailures/sampletests3.nim"
+      command = "nim r -d:unittest2ExpectedFailures=\"Passing test\" tests/expectedfailures/sampletests3.nim"
       (output, exitCode) = execCmdEx(command)
 
     check exitCode == 1
@@ -361,7 +361,7 @@ suite "expected failures":
 
   test "unexpected pass defined with a flag should fail and stop, compile-time tests":
     let
-      command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures='Passing test' tests/expectedfailures/sampletests3.nim"
+      command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures=\"Passing test\" tests/expectedfailures/sampletests3.nim"
       (output, exitCode) = execCmdEx(command)
 
     check exitCode == 1
@@ -371,7 +371,7 @@ suite "expected failures":
 
   test "expect all tests to fail, runtime tests":
     let
-      command = "nim r -d:unittest2ExpectedFailures='*' tests/expectedfailures/sampletests3.nim"
+      command = "nim r -d:unittest2ExpectedFailures=\"*\" tests/expectedfailures/sampletests3.nim"
       (output, exitCode) = execCmdEx(command)
 
     check exitCode == 1
