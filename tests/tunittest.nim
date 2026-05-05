@@ -293,7 +293,7 @@ suite "expected failures":
 
     for testFile in testFiles:
       let
-        command ="nim r tests/expectedfailures/$#" % [testFile]
+        command ="nim r tests/expectedfailures/" & testFile
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
@@ -309,7 +309,7 @@ suite "expected failures":
 
     for testFile in testFiles:
       let
-        command ="nim c -d:unittest2Static tests/expectedfailures/$#" % [testFile]
+        command ="nim c -d:unittest2Static tests/expectedfailures/" & testFile
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
@@ -324,7 +324,7 @@ suite "expected failures":
 
     for testSpec in testSpecs:
       let
-        command = "nim r -d:unittest2ExpectedFailures=\"$#\" tests/expectedfailures/sampletests3.nim" % [testSpec]
+        command = "nim r -d:unittest2ExpectedFailures=\"" & testSpec & "\" tests/expectedfailures/sampletests3.nim"
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
@@ -340,7 +340,7 @@ suite "expected failures":
 
     for testSpec in testSpecs:
       let
-        command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures=\"$#\" tests/expectedfailures/sampletests3.nim" % [testSpec]
+        command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures=\"" & testSpec & "\" tests/expectedfailures/sampletests3.nim"
         (output, exitCode) = execCmdEx(command)
 
       checkpoint "[Checkpoint] Testing command: " & command
