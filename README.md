@@ -69,7 +69,7 @@ Filters follow the same syntax as test selection: exact test name, `suite::test`
 value when needed by your shell:
 
 ```sh
-nim r '-d:unittest2ExpectedFailures=known-failure;flaky-suite::*;*wip*' test.nim
+nim r -d:unittest2ExpectedFailures="known-failure;flaky-suite::*;*wip*" test.nim
 ```
 
 ### Using config files
