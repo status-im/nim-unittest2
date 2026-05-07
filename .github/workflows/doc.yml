@@ -1,48 +1,23 @@
-name: Docgen
+name: Build Docs
+
 on:
   push:
     branches:
       - master
       - cidocs
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    timeout-minutes: 10
-
-    name: 'Generate & upload documentation'
-    runs-on: 'ubuntu-latest'
-    continue-on-error: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: jiro4989/setup-nim-action@v2
-        with:
-          nim-version: 'stable'
-
-      - name: Generate doc
-        run: |
-          nim --version
-          nim buildDocs || true
-
-      - name: Clone the gh-pages branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: subdoc
-          submodules: true
-          fetch-depth: 0
-
-      - name: Commit & push
-        run: |
-          rm -f subdoc/*
-          mv docs/* subdoc
-          cd subdoc
-          git add .
-          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-          git config --global user.name = "${{ github.actor }}"
-          git commit -a -m "update docs"
-          git push origin gh-pages
+  docs:
+    uses: status-im/nimbus-common-workflow/.github/workflows/docs.yml@main
+    with:
+      mdbook-version: "0.4.51"
+      mdbook-preprocessors: >-
+        [
+          "mdbook-open-on-gh@2.4.1",
+          "mdbook-shiftinclude@0.1.0",
+          "mdbook-toc@0.14.1",
+          "mdbook-admonish@1.14.0"
+        ]
