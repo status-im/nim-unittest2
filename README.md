@@ -7,7 +7,7 @@
 * **Clean Output**: Optimized for both human readability and CI pipelines.
 * **Isolated Execution**: Each test runs in its own procedure.
 * **Strict Exceptions**: Fully compatible with Nim's [exception tracking system](https://nim-lang.org/docs/manual.html#effect-system-exception-tracking).
-* **Tooling Integration**: Generates JUnit-compatible XML reports for CI/CD workflows.
+* **Tooling Integration**: Generates [JUnit](https://junit.org/)-compatible XML reports for CI/CD workflows.
 * **Compile-Time Tests**: Run your tests in the Nim VM during compilation to verify code logic early.
 * **Advanced Execution**: Supports a two-phase "Collect-and-Run" model for better progress tracking and test listing.
 
