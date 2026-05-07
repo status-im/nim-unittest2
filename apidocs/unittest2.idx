@@ -1,0 +1,59 @@
+nimTitle	unittest2	unittest2.html	module unittest2		0
+nim	VERBOSE	unittest2.html#VERBOSE	OutputLevel.VERBOSE		28
+nim	COMPACT	unittest2.html#COMPACT	OutputLevel.COMPACT		28
+nim	FAILURES	unittest2.html#FAILURES	OutputLevel.FAILURES		28
+nim	NONE	unittest2.html#NONE	OutputLevel.NONE		28
+nim	OutputLevel	unittest2.html#OutputLevel	enum OutputLevel		28
+nim	unittest2Static	unittest2.html#unittest2Static	const unittest2Static		68
+nim	unittest2ListTests	unittest2.html#unittest2ListTests	const unittest2ListTests		74
+nim	OK	unittest2.html#OK	TestStatus.OK		108
+nim	FAILED	unittest2.html#FAILED	TestStatus.FAILED		108
+nim	SKIPPED	unittest2.html#SKIPPED	TestStatus.SKIPPED		108
+nim	TestStatus	unittest2.html#TestStatus	enum TestStatus		108
+nim	TestResult	unittest2.html#TestResult	object TestResult		113
+nim	OutputFormatter	unittest2.html#OutputFormatter	type OutputFormatter		128
+nim	ConsoleOutputFormatter	unittest2.html#ConsoleOutputFormatter	type ConsoleOutputFormatter		132
+nim	JUnitOutputFormatter	unittest2.html#JUnitOutputFormatter	type JUnitOutputFormatter		179
+nim	abortOnError	unittest2.html#abortOnError	var abortOnError		191
+nim	suiteStarted	unittest2.html#suiteStarted.e,OutputFormatter,string	method suiteStarted(formatter: OutputFormatter; suiteName: string)		221
+nim	testStarted	unittest2.html#testStarted.e,OutputFormatter,string	method testStarted(formatter: OutputFormatter; testName: string)		225
+nim	failureOccurred	unittest2.html#failureOccurred.e,OutputFormatter,seq[string],string	method failureOccurred(formatter: OutputFormatter; checkpoints: seq[string];\n                stackTrace: string)		229
+nim	testEnded	unittest2.html#testEnded.e,OutputFormatter,TestResult	method testEnded(formatter: OutputFormatter; testResult: TestResult)		236
+nim	suiteEnded	unittest2.html#suiteEnded.e,OutputFormatter	method suiteEnded(formatter: OutputFormatter)		240
+nim	testRunEnded	unittest2.html#testRunEnded.e,OutputFormatter	method testRunEnded(formatter: OutputFormatter)		251
+nim	addOutputFormatter	unittest2.html#addOutputFormatter,OutputFormatter	proc addOutputFormatter(formatter: OutputFormatter)		298
+nim	resetOutputFormatters	unittest2.html#resetOutputFormatters	proc resetOutputFormatters()		302
+nim	newConsoleOutputFormatter	unittest2.html#newConsoleOutputFormatter,OutputLevel	proc newConsoleOutputFormatter(outputLevel: OutputLevel = outputLevelDefault;\n                          colorOutput = true): ConsoleOutputFormatter		306
+nim	defaultConsoleFormatter	unittest2.html#defaultConsoleFormatter	proc defaultConsoleFormatter(): ConsoleOutputFormatter		360
+nim	suiteStarted	unittest2.html#suiteStarted.e,ConsoleOutputFormatter,string	method suiteStarted(formatter: ConsoleOutputFormatter; suiteName: string)		421
+nim	testStarted	unittest2.html#testStarted.e,ConsoleOutputFormatter,string	method testStarted(formatter: ConsoleOutputFormatter; testName: string)		450
+nim	failureOccurred	unittest2.html#failureOccurred.e,ConsoleOutputFormatter,seq[string],string	method failureOccurred(formatter: ConsoleOutputFormatter; checkpoints: seq[string];\n                stackTrace: string)		476
+nim	testEnded	unittest2.html#testEnded.e,ConsoleOutputFormatter,TestResult	method testEnded(formatter: ConsoleOutputFormatter; testResult: TestResult)		538
+nim	suiteEnded	unittest2.html#suiteEnded.e,ConsoleOutputFormatter	method suiteEnded(formatter: ConsoleOutputFormatter)		576
+nim	testRunEnded	unittest2.html#testRunEnded.e,ConsoleOutputFormatter	method testRunEnded(formatter: ConsoleOutputFormatter)		625
+nim	newJUnitOutputFormatter	unittest2.html#newJUnitOutputFormatter,Stream	proc newJUnitOutputFormatter(stream: Stream): JUnitOutputFormatter		672
+nim	suiteStarted	unittest2.html#suiteStarted.e,JUnitOutputFormatter,string	method suiteStarted(formatter: JUnitOutputFormatter; suiteName: string)		696
+nim	testStarted	unittest2.html#testStarted.e,JUnitOutputFormatter,string	method testStarted(formatter: JUnitOutputFormatter; testName: string)		700
+nim	failureOccurred	unittest2.html#failureOccurred.e,JUnitOutputFormatter,seq[string],string	method failureOccurred(formatter: JUnitOutputFormatter; checkpoints: seq[string];\n                stackTrace: string)		703
+nim	testEnded	unittest2.html#testEnded.e,JUnitOutputFormatter,TestResult	method testEnded(formatter: JUnitOutputFormatter; testResult: TestResult)		712
+nim	suiteEnded	unittest2.html#suiteEnded.e,JUnitOutputFormatter	method suiteEnded(formatter: JUnitOutputFormatter)		715
+nim	testRunEnded	unittest2.html#testRunEnded.e,JUnitOutputFormatter	method testRunEnded(formatter: JUnitOutputFormatter)		777
+nim	parseParameters	unittest2.html#parseParameters,openArray[string]	proc parseParameters(args: openArray[string])		856
+nim	suite	unittest2.html#suite.t,string,untyped	template suite(nameParam: string; body: untyped)		908
+nim	checkpoint	unittest2.html#checkpoint.t,string	template checkpoint(msg: string)		978
+nim	fail	unittest2.html#fail.t	template fail()		998
+nim	skip	unittest2.html#skip.t	template skip()		1038
+nim	runtimeTest	unittest2.html#runtimeTest.t,string,untyped	template runtimeTest(nameParam: string; body: untyped)		1089
+nim	staticTest	unittest2.html#staticTest.t,string,untyped	template staticTest(nameParam: string; body: untyped)		1159
+nim	dualTest	unittest2.html#dualTest.t,string,untyped	template dualTest(nameParam: string; body: untyped)		1171
+nim	test	unittest2.html#test.t,string,untyped	template test(nameParam: string; body: untyped)		1181
+nim	check	unittest2.html#check.m,untyped	macro check(conditions: untyped): untyped		1218
+nim	require	unittest2.html#require.t,untyped	template require(conditions: untyped)		1338
+nim	expect	unittest2.html#expect.m,varargs[typed],untyped	macro expect(exceptions: varargs[typed]; body: untyped): untyped		1351
+nim	disableParamFiltering	unittest2.html#disableParamFiltering	proc disableParamFiltering()		1391
+nimgrp	testrunended	unittest2.html#testRunEnded-methods-all	method		251
+nimgrp	suitestarted	unittest2.html#suiteStarted-methods-all	method		221
+nimgrp	testended	unittest2.html#testEnded-methods-all	method		236
+nimgrp	failureoccurred	unittest2.html#failureOccurred-methods-all	method		229
+nimgrp	suiteended	unittest2.html#suiteEnded-methods-all	method		240
+nimgrp	teststarted	unittest2.html#testStarted-methods-all	method		225
