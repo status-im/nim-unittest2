@@ -18,3 +18,4 @@ jobs:
           "mdbook-toc@0.14.1",
           "mdbook-admonish@1.14.0"
         ]
+      docs-command: "nim docs"
