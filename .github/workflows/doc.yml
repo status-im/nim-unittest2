@@ -6,9 +6,6 @@ on:
       - master
       - cidocs
 
-permissions:
-  contents: read
-
 jobs:
   docs:
     uses: status-im/nimbus-common-workflow/.github/workflows/docs.yml@main
