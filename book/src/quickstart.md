@@ -22,12 +22,17 @@ requires "unittest2"
 
 ## First Test File
 
-`unittest2` follows the same core structure as `unittest`:
+`unittest2` follows this test structure:
 
-- Import `unittest2`.
-- Define test cases in [`test`](apidocs/unittest2.html#test.t,string,untyped) blocks.
-- Group related tests with [`suite`](apidocs/unittest2.html#suite.t,string,untyped).
-- Use `setup` and `teardown` to define code that runs before and after each test.
+- **Module**. A .nim file that has an `import unittest2` in it, usually sits in `tests` directory of your project, and is named starting with a `t` by convention, e.g. `tmath.nim`. A module holds the tests that cover a particular topic or a module in your project.
+- **Suite**. Defined with [`suite`](apidocs/unittest2.html#suite.t,string,untyped) block, it's a group of related tests. In he `tmath.nim` example, you could have a suite like "Overflow checks" and "Basic arithmetic."
+- **Test case**. A single atomic check under a [`test`](apidocs/unittest2.html#test.t,string,untyped) block. In `tmath.nim` suite "Basic arithmetic," you could have tests like "Addition"and "Subtraction."
+
+Aside from `test`, you can use `setup` and `teardown` blocks inside `suite`.
+
+`setup` block defines the code that runs before each test.
+
+`teardown` block defines the code that runs after each test.
 
 Create `test.nim`:
 
