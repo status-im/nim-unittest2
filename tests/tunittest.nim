@@ -286,3 +286,97 @@ suite "list tests":
     check count(output, "Test:") == 16
     check count(output, "File:") == 16
     check count(output, "Hello") == 0
+
+suite "expected failures":
+  test "expected failures defined in config file should pass, runtime tests":
+    let testFiles = ["sampletests1.nim", "sampletests2.nim"]
+
+    for testFile in testFiles:
+      let
+        command ="nim r tests/expectedfailures/" & testFile
+        (output, exitCode) = execCmdEx(command)
+
+      checkpoint "[Checkpoint] Testing command: " & command
+
+      check exitCode == 0
+
+      check output.contains("2 XFAIL")
+      check output.contains("Failing test 1")
+      check output.contains("Failing test 2")
+
+  test "expected failures defined in config file should pass, compile-time tests":
+    let testFiles = ["sampletests1.nim", "sampletests2.nim"]
+
+    for testFile in testFiles:
+      let
+        command ="nim c -d:unittest2Static tests/expectedfailures/" & testFile
+        (output, exitCode) = execCmdEx(command)
+
+      checkpoint "[Checkpoint] Testing command: " & command
+
+      check exitCode == 0
+
+      check output.contains("[XFAIL  ] Failing test 1")
+      check output.contains("[XFAIL  ] Failing test 2")
+
+  test "expected failure defined with a flag should pass, runtime tests":
+    let testSpecs = ["Failing test", "Sample tests::Failing test", "Failing*"]
+
+    for testSpec in testSpecs:
+      let
+        command = "nim r -d:unittest2ExpectedFailures=\"" & testSpec & "\" tests/expectedfailures/sampletests3.nim"
+        (output, exitCode) = execCmdEx(command)
+
+      checkpoint "[Checkpoint] Testing command: " & command
+
+      check exitCode == 0
+
+      check output.contains("1 XFAIL")
+      check output.contains("Failing test")
+
+  test "expected failure defined with a flag should pass, compile-time tests":
+    let testSpecs = ["Failing test", "Sample tests::Failing test", "Failing*"]
+
+    for testSpec in testSpecs:
+      let
+        command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures=\"" & testSpec & "\" tests/expectedfailures/sampletests3.nim"
+        (output, exitCode) = execCmdEx(command)
+
+      checkpoint "[Checkpoint] Testing command: " & command
+
+      check exitCode == 0
+
+      check output.contains("[XFAIL  ] Failing test")
+
+  test "unexpected pass defined with a flag should fail, runtime tests":
+    let
+      command = "nim r -d:unittest2ExpectedFailures=\"Passing test\" tests/expectedfailures/sampletests3.nim"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 1
+
+    check output.contains("1 XPASS")
+    check output.contains("Passing test")
+
+  test "unexpected pass defined with a flag should fail and stop, compile-time tests":
+    let
+      command = "nim c -d:unittest2Static -d:unittest2ExpectedFailures=\"Passing test\" tests/expectedfailures/sampletests3.nim"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 1
+
+    check output.contains("[XPASS  ] Passing test")
+    check not output.contains("Failing test")
+
+  test "expect all tests to fail, runtime tests":
+    let
+      command = "nim r -d:unittest2ExpectedFailures=\"*\" tests/expectedfailures/sampletests3.nim"
+      (output, exitCode) = execCmdEx(command)
+
+    check exitCode == 1
+
+    check output.contains("1 XFAIL")
+    check output.contains("Failing test")
+
+    check output.contains("1 XPASS")
+    check output.contains("Passing test")
