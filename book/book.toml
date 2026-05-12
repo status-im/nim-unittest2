@@ -1,0 +1,31 @@
+[book]
+title = "unittest2"
+authors = [
+  "Zahary Karadjov",
+  "Ștefan Talpalaru",
+  "Status Research and Development",
+  "Constantine Molchanov",
+]
+language = "en"
+multilingual = false
+src = "src"
+
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]
+max-level = 2
+
+[preprocessor.open-on-gh]
+command = "mdbook-open-on-gh"
+renderer = ["html"]
+git-branch = "master"
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.1" # do not edit: managed by `mdbook-admonish install`
+
+[preprocessor.shiftinclude]
+
+[output.html]
+git-repository-url = "https://github.com/status-im/nim-unittest2/"
+additional-css = ["open-in.css", "mdbook-admonish.css"]
