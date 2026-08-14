@@ -949,10 +949,10 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
       var testSuiteTeardownIMPLFlag {.used.} = true
       template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
 
+    let suiteName {.inject.} = nameParam
     when nimvm:
       discard
     else:
-      let suiteName {.inject.} = nameParam
       when not collect:
         # TODO deal with suite nesting
         if currentSuite.len > 0:
