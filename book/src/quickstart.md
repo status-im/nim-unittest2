@@ -79,22 +79,21 @@ nim c -d:unittest2Static=true test.nim
 
 Run tests locally:
 
-```text
-# this calls a task in "config.nims"
-nim test
+```sh
+nimble test
 ```
 
 Build the documentation locally:
 
 ```sh
 # Build both the book and apidocs
-nim docs
+nimble docs
 
 # Build only the book
-nim book
+nimble book
 
 # Build only the apidocs
-nim apidocs
+nimble apidocs
 ```
 
 Navigate the generated docs:
