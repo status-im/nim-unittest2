@@ -12,12 +12,8 @@
 import std/[
   macros, sequtils, sets, strutils, streams, tables, times, monotimes]
 
-when defined(nimHasWarnBareExcept):
-  # In unit tests, we want to at least attempt to catch Exception no matter its
-  # UB
-  {.warning[BareExcept]: off.}
-
-{.warning[LockLevel]: off.}
+# In unit tests, we want to at least attempt to catch Exception no matter its UB
+{.warning[BareExcept]: off.}
 
 when declared(stdout):
   import std/os
@@ -88,14 +84,7 @@ when isolate:
     isolated = getEnv("UNITTEST2_ISOLATED") == "1"
       ## Test is running in the isolated environment
 
-from std/exitprocs import nil
-template addExitProc(p: proc) =
-  ## Register an exit handler and terminate with a diagnostic on failure.
-  try:
-    exitprocs.addExitProc(p)
-  except Exception as e:
-    echo "Can't add exit proc", e.msg
-    quit(1)
+from std/exitprocs import addExitProc
 
 type
   Test = object
@@ -778,8 +767,7 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
   ## Completes the report and closes the underlying stream.
   let s = formatter.stream
 
-  when defined(nimHasWarnBareExcept):
-    {.warning[BareExcept]:off.}
+  {.warning[BareExcept]:off.}
   try:
     s.writeLine("<testsuites>")
 
@@ -795,8 +783,7 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
     echo "Cannot write JUnit: ", exc.msg
     quit 1
 
-  when defined(nimHasWarnBareExcept):
-    {.warning[BareExcept]:on.}
+  {.warning[BareExcept]:on.}
 
 proc glob(matcher, filter: string): bool =
   ## Globbing using exactly one `*`. Empty `filter` matches everything.
@@ -1105,8 +1092,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
       fail()
 
     template failingOnExceptions(prefix: string, code: untyped): untyped =
-      when NimMajor>=2:
-        {.push warning[UnnamedBreak]:off.}
+      {.push warning[UnnamedBreak]:off.}
       try:
         block:
           code
@@ -1116,8 +1102,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
         prefix.fail("defect", e)
       except Exception as e:
         prefix.fail("exception that may cause undefined behavior", e)
-      when NimMajor>=2:
-        {.pop.}
+      {.pop.}
 
     failingOnExceptions("[setup] "):
       when declared(testSetupIMPLFlag): testSetupIMPL()
