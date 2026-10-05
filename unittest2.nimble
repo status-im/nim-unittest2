@@ -1,10 +1,10 @@
 mode = ScriptMode.Verbose
 
-version       = "0.2.6"
+version       = "0.3.0"
 author        = "Status Research & Development GmbH"
 description   = "unittest fork with support for parallel test execution"
 license       = "MIT"
-requires "nim >= 1.6.0"
+requires "nim >= 2.0.6"
 
 let nimc = getEnv("NIMC", "nim") # Which nim compiler to use
 let lang = getEnv("NIMLANG", "c") # Which backend (c/cpp/js)
