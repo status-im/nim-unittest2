@@ -286,3 +286,12 @@ suite "list tests":
     check count(output, "Test:") == 16
     check count(output, "File:") == 16
     check count(output, "Hello") == 0
+
+when unittest2ProcSuite:
+  # Verify that suite works under strict push pragmas
+  {.push raises: [], gcsafe.}
+  suite "suite variables should be gcsafe":
+    let localData = @[1, 2, 3]
+    test "reads local data":
+      check localData.len == 3
+  {.pop.}

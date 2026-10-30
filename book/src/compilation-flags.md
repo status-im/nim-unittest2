@@ -29,6 +29,10 @@
 - `-d:unittest2PreviewIsolate=true`: Enable preview isolation mode.
   - Each test is run in a separate process to ensure complete isolation. This may be removed in the future.
   - Set with `-d:unittest2PreviewIsolate=true`.
+- `-d:unittest2ProcSuite=true`: Run suite bodies inside a proc instead of a plain `block:`.
+  - By default, suites run in a `block:`. Enabling this runs each suite body inside a proc, so suite-level variables are locals rather than module globals. This keeps them out of the GC's global marker table under `--mm:refc` (capped at 3500 entries), frees them once the suite is done, and lets them be used from tests under `{.push gcsafe.}`.
+  - The catch: procs declared in a suite that touch suite-level variables become closures. Callbacks that can't be closures (`{.nimcall.}`, `{.cdecl.}`, `{.thread.}`) will fail to compile (e.g. `illegal capture`). Move those variables to module level.
+  - Set with `-d:unittest2ProcSuite=true`.
 
 ## Standard Library Compatibility
 

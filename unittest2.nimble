@@ -1,6 +1,6 @@
 mode = ScriptMode.Verbose
 
-version       = "0.3.0"
+version       = "0.3.1"
 author        = "Status Research & Development GmbH"
 description   = "unittest fork with support for parallel test execution"
 license       = "MIT"
@@ -50,6 +50,8 @@ task test, "Run all tests":
 
   testOptions "--mm:refc"
   testOptions "--mm:orc"
+
+  run "--threads:on -d:unittest2ProcSuite=true --mm:refc", "tests/tunittest"
 
 task test_asan, "Run all tests with ASAN":
   if platform != "x86":
