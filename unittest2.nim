@@ -70,6 +70,17 @@ const
   unittest2ListTests* {.booldefine.} = false
     ## List tests at runtime without actually running them (useful for test runners).
     ## Set with `-d:unittest2ListTests=true`.
+  unittest2ProcSuite* {.booldefine.} = false
+    ## Run each suite body inside a proc, so suite-level variables are locals
+    ## rather than module globals. This keeps them out of the GC's global marker
+    ## table under `--mm:refc`, frees them once the suite is done, and lets them
+    ## be used from tests under `{.push gcsafe.}`.
+    ## The catch:
+    ## - Procs declared in a suite that touch suite-level variables become
+    ##   closures, so `{.nimcall.}`, `{.cdecl.}` and `{.thread.}` callbacks
+    ##   doing that won't compile.
+    ## - A `return` at suite level exits the suite rather than an enclosing proc.
+    ## Set with `-d:unittest2ProcSuite=true`.
 
 when useTerminal:
   import std/terminal
@@ -892,6 +903,16 @@ proc ensureInitialized() =
 
 ensureInitialized() # Run once!
 
+template suiteScope(body: untyped) =
+  ## Scope for a suite body: a plain `block:` by default, or a proc when
+  ## `unittest2ProcSuite` is enabled (keeps suite-level variables as locals
+  ## rather than module globals).
+  when unittest2ProcSuite:
+    (proc () =
+      block: body)()
+  else:
+    block: body
+
 template suite*(nameParam: string, body: untyped) {.dirty.} =
   ## Declare a test suite identified by `name` with optional ``setup``
   ## and/or ``teardown`` section.
@@ -921,9 +942,9 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind collect, currentSuite, suiteStarted, suiteEnded
+  bind collect, currentSuite, suiteStarted, suiteEnded, suiteScope
 
-  block:
+  suiteScope:
     template setup(setupBody: untyped) {.dirty, used.} =
       var testSetupIMPLFlag {.used.} = true
       template testSetupIMPL: untyped {.dirty.} = setupBody

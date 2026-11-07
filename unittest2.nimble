@@ -1,6 +1,6 @@
 mode = ScriptMode.Verbose
 
-version       = "0.3.0"
+version       = "0.3.1"
 author        = "Status Research & Development GmbH"
 description   = "unittest fork with support for parallel test execution"
 license       = "MIT"
@@ -43,13 +43,15 @@ proc testOptions(args: string) =
 task test, "Run all tests":
   for compat in ["-d:unittest2Compat=false", "-d:unittest2Compat=true"]:
     for color in ["-d:nimUnittestColor=on", "-d:nimUnittestColor=off"]:
-      let args = "--threads:on " & compat & " " & color
-      for level in ["VERBOSE", "COMPACT", "FAILURES", "NONE"]:
-        run args & " --mm:refc", "tests/tunittest", "--output-level=" & level
-        run args & " --mm:orc", "tests/tunittest", "--output-level=" & level
+      for procSuite in ["-d:unittest2ProcSuite=false", "-d:unittest2ProcSuite=true"]:
+        let args = "--threads:on " & compat & " " & color & " " & procSuite
+        for level in ["VERBOSE", "COMPACT", "FAILURES", "NONE"]:
+          run args & " --mm:refc", "tests/tunittest", "--output-level=" & level
+          run args & " --mm:orc", "tests/tunittest", "--output-level=" & level
 
-  testOptions "--mm:refc"
-  testOptions "--mm:orc"
+  for procSuite in ["-d:unittest2ProcSuite=false", "-d:unittest2ProcSuite=true"]:
+    testOptions procSuite & " --mm:refc"
+    testOptions procSuite & " --mm:orc"
 
 task test_asan, "Run all tests with ASAN":
   if platform != "x86":
@@ -66,11 +68,13 @@ task test_asan, "Run all tests with ASAN":
       " --passC:-fno-omit-frame-pointer"
     for compat in ["-d:unittest2Compat=false", "-d:unittest2Compat=true"]:
       for color in ["-d:nimUnittestColor=on", "-d:nimUnittestColor=off"]:
-        let args = "--threads:on " & compat & " " & color
-        for level in ["VERBOSE", "COMPACT", "FAILURES", "NONE"]:
-          run args & asanArgs, "tests/tunittest", "--output-level=" & level
+        for procSuite in ["-d:unittest2ProcSuite=false", "-d:unittest2ProcSuite=true"]:
+          let args = "--threads:on " & compat & " " & color & " " & procSuite
+          for level in ["VERBOSE", "COMPACT", "FAILURES", "NONE"]:
+            run args & asanArgs, "tests/tunittest", "--output-level=" & level
 
-    testOptions asanArgs
+    for procSuite in ["-d:unittest2ProcSuite=false", "-d:unittest2ProcSuite=true"]:
+      testOptions procSuite & asanArgs
 
 task book, "Generate book":
   exec "mdbook build book -d ../docs"
