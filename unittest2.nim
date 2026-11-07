@@ -75,9 +75,11 @@ const
     ## rather than module globals. This keeps them out of the GC's global marker
     ## table under `--mm:refc`, frees them once the suite is done, and lets them
     ## be used from tests under `{.push gcsafe.}`.
-    ## The catch: procs declared in a suite that touch suite-level variables
-    ## become closures, so `{.nimcall.}`, `{.cdecl.}` and `{.thread.}` callbacks
-    ## doing that won't compile.
+    ## The catch:
+    ## - Procs declared in a suite that touch suite-level variables become
+    ##   closures, so `{.nimcall.}`, `{.cdecl.}` and `{.thread.}` callbacks
+    ##   doing that won't compile.
+    ## - A `return` at suite level exits the suite rather than an enclosing proc.
     ## Set with `-d:unittest2ProcSuite=true`.
 
 when useTerminal:
@@ -906,9 +908,8 @@ template suiteScope(body: untyped) =
   ## `unittest2ProcSuite` is enabled (keeps suite-level variables as locals
   ## rather than module globals).
   when unittest2ProcSuite:
-    {.push hint[XCannotRaiseY]: off.}
-    (proc () {.raises: [Exception].} = body)()
-    {.pop.}
+    (proc () =
+      block: body)()
   else:
     block: body
 
