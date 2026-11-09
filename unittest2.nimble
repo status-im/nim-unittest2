@@ -50,8 +50,10 @@ task test, "Run all tests":
           run args & " --mm:orc", "tests/tunittest", "--output-level=" & level
 
   for procSuite in ["-d:unittest2ProcSuite=false", "-d:unittest2ProcSuite=true"]:
-    testOptions procSuite & " --mm:refc"
-    testOptions procSuite & " --mm:orc"
+    for mm in [" --mm:refc", " --mm:orc"]:
+      testOptions procSuite & mm
+      run procSuite & mm & " -d:unittest2ListTests", "tests/tunittest"
+      run procSuite & mm & " -d:unittest2PreviewIsolate", "tests/tunittest"
 
 task test_asan, "Run all tests with ASAN":
   if platform != "x86":
@@ -75,6 +77,8 @@ task test_asan, "Run all tests with ASAN":
 
     for procSuite in ["-d:unittest2ProcSuite=false", "-d:unittest2ProcSuite=true"]:
       testOptions procSuite & asanArgs
+      run procSuite & asanArgs & " -d:unittest2ListTests", "tests/tunittest"
+      run procSuite & asanArgs & " -d:unittest2PreviewIsolate", "tests/tunittest"
 
 task book, "Generate book":
   exec "mdbook build book -d ../docs"
