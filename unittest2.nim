@@ -81,6 +81,12 @@ const
     ##   doing that won't compile.
     ## - A `return` at suite level exits the suite rather than an enclosing proc.
     ## Set with `-d:unittest2ProcSuite=true`.
+  unittest2CompactDots* {.booldefine.} = false
+    ## Compress consecutive successful tests into a short success display
+    ## in the compact progress line (ansi mode only) - see `successDisplay`.
+    ## Set with `-d:unittest2CompactDots=true` to enable it.
+
+const compactDots = useTerminal and unittest2CompactDots
 
 when useTerminal:
   import std/terminal
@@ -155,6 +161,12 @@ type
     curSuite: int
     curTestName: string
     curTest: int
+
+    when compactDots:
+      successCount*: int
+        ## Number of consecutive successful tests since the last failure
+        ## (ansi mode only), used to compress the compact progress line -
+        ## see `successDisplay`.
 
     statuses: array[TestStatus, int]
 
@@ -424,6 +436,9 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
 
   formatter.curTest.reset()
 
+  when compactDots:
+    formatter.successCount = 0
+
   if formatter.outputLevel in {OutputLevel.FAILURES, OutputLevel.NONE}:
     return
 
@@ -535,6 +550,50 @@ proc printTestResultStatus(formatter: ConsoleOutputFormatter, testResult: TestRe
     stdout.styledWrite "  ", status, " ", duration, " ", testResult.testName
   echo ""
 
+const dotProgression* = ".:-=+*#%@"
+  ## Success marker progression (ansi mode only): the base-10 digits of the
+  ## number of consecutive successful tests, each rendered with the character
+  ## of its position - units are '.', tens ':', hundreds '-', and so on.
+
+proc successDisplay*(n: int): string =
+  ## The compact progress display for `n` consecutive successful tests
+  ## (ansi mode only) - see `dotProgression`.
+  var n = n
+  if n <= 0:
+    return
+  var digits = ""
+  while n > 0:
+    digits = $char(n mod 10 + 48) & digits
+    n = n div 10
+  for i in 0 ..< digits.len:
+    let level = digits.len - 1 - i
+    if level < dotProgression.len:
+      result &= dotProgression[level].repeat(ord(digits[i]) - 48)
+
+when compactDots:
+  proc compressSuccessDots*(formatter: ConsoleOutputFormatter, f: File) =
+    ## Rewrite the current success display region in place with the
+    ## compressed display for `formatter.successCount` consecutive
+    ## successful tests (ansi mode only) - see `successDisplay`. Called
+    ## right after a carry shrank the display, so the on-screen display
+    ## is the one for `successCount - 1`. The settled content before the
+    ## region is left in place; the region is padded with spaces up to
+    ## the old display's width, and the cursor is then moved back over
+    ## the padding so that it sits right after the (shorter) display -
+    ## the next appended dot lands there.
+    try:
+      let
+        oldLen = successDisplay(formatter.successCount - 1).len
+        display = successDisplay(formatter.successCount)
+        padding = oldLen - display.len
+      f.cursorBackward(oldLen)
+      f.styledWrite styleBright, fgGreen, display
+      if padding > 0:
+        f.write(" ".repeat(padding))
+        f.cursorBackward(padding)
+    except CatchableError: discard
+    f.flushFile()
+
 method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   formatter.statuses[testResult.status] += 1
   formatter.totalDuration += testResult.duration
@@ -567,11 +626,27 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
     let
       marker = testResult.status.marker()
       color = testResult.status.color()
-    formatter.write do:
+    var compressed = false
+    when compactDots:
+      if formatter.colorOutput:
+        if testResult.status == TestStatus.OK:
+          inc formatter.successCount
+          if formatter.successCount mod 10 == 0:
+            # The display shrank (a carry rolled the units digit over) -
+            # rewrite the region in place, padded, and leave the cursor
+            # right after the display - see `compressSuccessDots`
+            compressed = true
+        else:
+          formatter.successCount = 0
+    if compressed:
+      when compactDots:
+        compressSuccessDots(formatter, stdout)
+    else:
+      formatter.write do:
         stdout.styledWrite styleBright, color, marker
-    do:
-      stdout.write marker
-    stdout.flushFile()
+      do:
+        stdout.write marker
+      stdout.flushFile()
 
 method suiteEnded*(formatter: ConsoleOutputFormatter) =
   if formatter.outputLevel == OutputLevel.NONE:

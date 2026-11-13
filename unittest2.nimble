@@ -53,6 +53,9 @@ task test, "Run all tests":
     testOptions procSuite & " --mm:refc"
     testOptions procSuite & " --mm:orc"
 
+  run "", "tests/tcompactdots"
+  run "-d:unittest2CompactDots=true", "tests/tcompactdots"
+
 task test_asan, "Run all tests with ASAN":
   if platform != "x86":
     # https://clang.llvm.org/docs/AddressSanitizer.html
