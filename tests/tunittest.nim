@@ -85,7 +85,6 @@ test "#964":
   check spuds == 24
 
 
-from strutils import toUpperAscii, parseInt
 test "#1384":
   check(@["hello", "world"].map(toUpperAscii) == @["HELLO", "WORLD"])
 
