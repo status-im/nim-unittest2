@@ -35,6 +35,8 @@
     - Procs declared in a suite that touch suite-level variables become closures. Callbacks that can't be closures (`{.nimcall.}`, `{.cdecl.}`, `{.thread.}`) will fail to compile (e.g. `illegal capture`). Move those variables to module level.
     - A `return` at suite level exits the suite rather than an enclosing proc.
   - Set with `-d:unittest2ProcSuite=true`.
+- `-d:unittest2CompactDots=true`: Compress consecutive successful tests into a short success display in the compact progress line (ANSI mode only, default is `false`).
+  - Set with `-d:unittest2CompactDots=true`.
 
 ## Standard Library Compatibility
 
