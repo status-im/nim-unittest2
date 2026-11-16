@@ -12,12 +12,8 @@
 import std/[
   macros, sequtils, strutils, streams, tables, times, monotimes]
 
-when defined(nimHasWarnBareExcept):
-  # In unit tests, we want to at least attempt to catch Exception no matter its
-  # UB
-  {.warning[BareExcept]: off.}
-
-{.warning[LockLevel]: off.}
+# In unit tests, we want to at least attempt to catch Exception no matter its UB
+{.warning[BareExcept]: off.}
 
 when declared(stdout):
   import std/os
@@ -76,6 +72,23 @@ const
   unittest2ListTests* {.booldefine.} = false
     ## List tests at runtime without actually running them (useful for test runners).
     ## Set with `-d:unittest2ListTests=true`.
+  unittest2ProcSuite* {.booldefine.} = false
+    ## Run each suite body inside a proc, so suite-level variables are locals
+    ## rather than module globals. This keeps them out of the GC's global marker
+    ## table under `--mm:refc`, frees them once the suite is done, and lets them
+    ## be used from tests under `{.push gcsafe.}`.
+    ## The catch:
+    ## - Procs declared in a suite that touch suite-level variables become
+    ##   closures, so `{.nimcall.}`, `{.cdecl.}` and `{.thread.}` callbacks
+    ##   doing that won't compile.
+    ## - A `return` at suite level exits the suite rather than an enclosing proc.
+    ## Set with `-d:unittest2ProcSuite=true`.
+  unittest2CompactDots* {.booldefine.} = false
+    ## Compress consecutive successful tests into a short success display
+    ## in the compact progress line (ansi mode only) - see `successDisplay`.
+    ## Set with `-d:unittest2CompactDots=true` to enable it.
+
+const compactDots = useTerminal and unittest2CompactDots
 
 when useTerminal:
   import std/terminal
@@ -90,14 +103,7 @@ when isolate:
     isolated = getEnv("UNITTEST2_ISOLATED") == "1"
       ## Test is running in the isolated environment
 
-from std/exitprocs import nil
-template addExitProc(p: proc) =
-  ## Register an exit handler and terminate with a diagnostic on failure.
-  try:
-    exitprocs.addExitProc(p)
-  except Exception as e:
-    echo "Can't add exit proc", e.msg
-    quit(1)
+from std/exitprocs import addExitProc
 
 type
   Test = object
@@ -159,6 +165,12 @@ type
     curSuite: int
     curTestName: string
     curTest: int
+
+    when compactDots:
+      successCount*: int
+        ## Number of consecutive successful tests since the last failure
+        ## (ansi mode only), used to compress the compact progress line -
+        ## see `successDisplay`.
 
     statuses: array[TestStatus, int]
 
@@ -435,6 +447,9 @@ method suiteStarted*(formatter: ConsoleOutputFormatter, suiteName: string) =
 
   formatter.curTest.reset()
 
+  when compactDots:
+    formatter.successCount = 0
+
   if formatter.outputLevel in {OutputLevel.FAILURES, OutputLevel.NONE}:
     return
 
@@ -550,6 +565,50 @@ proc printTestResultStatus(formatter: ConsoleOutputFormatter, testResult: TestRe
     stdout.styledWrite "  ", status, " ", duration, " ", testResult.testName
   echo ""
 
+const dotProgression* = ".:-=+*#%@"
+  ## Success marker progression (ansi mode only): the base-10 digits of the
+  ## number of consecutive successful tests, each rendered with the character
+  ## of its position - units are '.', tens ':', hundreds '-', and so on.
+
+proc successDisplay*(n: int): string =
+  ## The compact progress display for `n` consecutive successful tests
+  ## (ansi mode only) - see `dotProgression`.
+  var n = n
+  if n <= 0:
+    return
+  var digits = ""
+  while n > 0:
+    digits = $char(n mod 10 + 48) & digits
+    n = n div 10
+  for i in 0 ..< digits.len:
+    let level = digits.len - 1 - i
+    if level < dotProgression.len:
+      result &= dotProgression[level].repeat(ord(digits[i]) - 48)
+
+when compactDots:
+  proc compressSuccessDots*(formatter: ConsoleOutputFormatter, f: File) =
+    ## Rewrite the current success display region in place with the
+    ## compressed display for `formatter.successCount` consecutive
+    ## successful tests (ansi mode only) - see `successDisplay`. Called
+    ## right after a carry shrank the display, so the on-screen display
+    ## is the one for `successCount - 1`. The settled content before the
+    ## region is left in place; the region is padded with spaces up to
+    ## the old display's width, and the cursor is then moved back over
+    ## the padding so that it sits right after the (shorter) display -
+    ## the next appended dot lands there.
+    try:
+      let
+        oldLen = successDisplay(formatter.successCount - 1).len
+        display = successDisplay(formatter.successCount)
+        padding = oldLen - display.len
+      f.cursorBackward(oldLen)
+      f.styledWrite styleBright, fgGreen, display
+      if padding > 0:
+        f.write(" ".repeat(padding))
+        f.cursorBackward(padding)
+    except CatchableError: discard
+    f.flushFile()
+
 method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   formatter.statuses[testResult.status] += 1
   formatter.totalDuration += testResult.duration
@@ -584,11 +643,27 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
     let
       marker = testResult.status.marker()
       color = testResult.status.color()
-    formatter.write do:
+    var compressed = false
+    when compactDots:
+      if formatter.colorOutput:
+        if testResult.status == TestStatus.OK:
+          inc formatter.successCount
+          if formatter.successCount mod 10 == 0:
+            # The display shrank (a carry rolled the units digit over) -
+            # rewrite the region in place, padded, and leave the cursor
+            # right after the display - see `compressSuccessDots`
+            compressed = true
+        else:
+          formatter.successCount = 0
+    if compressed:
+      when compactDots:
+        compressSuccessDots(formatter, stdout)
+    else:
+      formatter.write do:
         stdout.styledWrite styleBright, color, marker
-    do:
-      stdout.write marker
-    stdout.flushFile()
+      do:
+        stdout.write marker
+      stdout.flushFile()
 
 method suiteEnded*(formatter: ConsoleOutputFormatter) =
   if formatter.outputLevel == OutputLevel.NONE:
@@ -802,8 +877,7 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
   ## Completes the report and closes the underlying stream.
   let s = formatter.stream
 
-  when defined(nimHasWarnBareExcept):
-    {.warning[BareExcept]:off.}
+  {.warning[BareExcept]:off.}
   try:
     s.writeLine("<testsuites>")
 
@@ -819,8 +893,7 @@ method testRunEnded*(formatter: JUnitOutputFormatter) =
     echo "Cannot write JUnit: ", exc.msg
     quit 1
 
-  when defined(nimHasWarnBareExcept):
-    {.warning[BareExcept]:on.}
+  {.warning[BareExcept]:on.}
 
 proc glob(matcher, filter: string): bool =
   ## Globbing using exactly one `*`. Empty `filter` matches everything.
@@ -953,6 +1026,16 @@ proc ensureInitialized() =
 
 ensureInitialized() # Run once!
 
+template suiteScope(body: untyped) =
+  ## Scope for a suite body: a plain `block:` by default, or a proc when
+  ## `unittest2ProcSuite` is enabled (keeps suite-level variables as locals
+  ## rather than module globals).
+  when unittest2ProcSuite:
+    (proc () =
+      block: body)()
+  else:
+    block: body
+
 template suite*(nameParam: string, body: untyped) {.dirty.} =
   ## Declare a test suite identified by `name` with optional ``setup``
   ## and/or ``teardown`` section.
@@ -982,9 +1065,9 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
   ##  [Suite] test suite for addition
   ##    [OK] 2 + 2 = 4
   ##    [OK] (2 + -2) != 4
-  bind collect, currentSuite, suiteStarted, suiteEnded
+  bind collect, currentSuite, suiteStarted, suiteEnded, suiteScope
 
-  block:
+  suiteScope:
     template setup(setupBody: untyped) {.dirty, used.} =
       var testSetupIMPLFlag {.used.} = true
       template testSetupIMPL: untyped {.dirty.} = setupBody
@@ -997,7 +1080,7 @@ template suite*(nameParam: string, body: untyped) {.dirty.} =
       var testSuiteTeardownIMPLFlag {.used.} = true
       template testSuiteTeardownIMPL: untyped {.dirty.} = suiteTeardownBody
 
-    template suiteName: untyped {.inject, used.} = nameParam
+    let suiteName {.inject.} = nameParam
     when nimvm:
       discard
     else:
@@ -1152,8 +1235,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
       fail()
 
     template failingOnExceptions(prefix: string, code: untyped): untyped =
-      when NimMajor>=2:
-        {.push warning[UnnamedBreak]:off.}
+      {.push warning[UnnamedBreak]:off.}
       try:
         block:
           code
@@ -1163,8 +1245,7 @@ template runtimeTest*(nameParam: string, body: untyped) =
         prefix.fail("defect", e)
       except Exception as e:
         prefix.fail("exception that may cause undefined behavior", e)
-      when NimMajor>=2:
-        {.pop.}
+      {.pop.}
 
     failingOnExceptions("[setup] "):
       when declared(testSetupIMPLFlag): testSetupIMPL()

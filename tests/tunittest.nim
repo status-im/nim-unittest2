@@ -85,7 +85,6 @@ test "#964":
   check spuds == 24
 
 
-from strutils import toUpperAscii, parseInt
 test "#1384":
   check(@["hello", "world"].map(toUpperAscii) == @["HELLO", "WORLD"])
 
@@ -380,3 +379,12 @@ suite "expected failures":
 
     check output.contains("1 XPASS")
     check output.contains("Passing test")
+
+when unittest2ProcSuite:
+  # Verify that suite works under strict push pragmas
+  {.push raises: [], gcsafe.}
+  suite "suite variables should be gcsafe":
+    let localData = @[1, 2, 3]
+    test "reads local data":
+      check localData.len == 3
+  {.pop.}
