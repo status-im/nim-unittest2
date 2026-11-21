@@ -211,6 +211,7 @@ var
   testsFilters {.threadvar.}: HashSet[string]
 
   currentSuite {.threadvar.}: string
+  currentTestName {.threadvar.}: string
   testStatus {.threadvar.}: TestStatus
 
 when collect:
@@ -273,11 +274,13 @@ when collect:
 
 proc suiteStarted(name: string) =
   ## Broadcast suite start event to all registered formatters.
+  currentSuite = name
   for formatter in formatters:
     formatter.suiteStarted(name)
 
 proc testStarted(name: string) =
   ## Broadcast test start event to all registered formatters.
+  currentTestName = name
   for formatter in formatters:
     formatter.testStarted(name)
 
@@ -1114,7 +1117,16 @@ template fail* =
       else:
         formatter.failureOccurred(checkpoints, "")
 
-    if abortOnError: quit(1)
+    if abortOnError:
+      # Broadcast the failure as a test result so it is printed even though
+      # the test body is aborted before the normal testEnded call.
+      testEnded(TestResult(
+        suiteName: currentSuite,
+        testName: currentTestName,
+        status: testStatus,
+        duration: DurationZero
+      ))
+      quit(1)
 
     checkpoints.reset()
 
@@ -1418,8 +1430,8 @@ macro check*(conditions: untyped): untyped =
 
 template require*(conditions: untyped) =
   ## Same as `check` except any failed test causes the program to quit
-  ## immediately. Any teardown statements are not executed and the failed
-  ## test output is not generated.
+  ## immediately. Any teardown statements are not executed, but the failed
+  ## test output is still generated before quitting.
   when nimvm:
     check conditions
   else:

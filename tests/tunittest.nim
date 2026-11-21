@@ -286,6 +286,22 @@ suite "list tests":
     check count(output, "File:") == 16
     check count(output, "Hello") == 0
 
+suite "abortOnError":
+  test "require failure is printed on early exit":
+    let (output, exitCode) = execCmdEx("nim c -r tests/abortonerror.nim")
+
+    check exitCode != 0
+    check "Check failed: 1 + 1 == 3" in output
+    check "[FAILED " in output
+    check "never reached" notin output
+
+  test "failure is printed on early exit with global abortOnError":
+    let (output, exitCode) = execCmdEx("UNITTEST2_ABORT_ON_ERROR=1 nim c -r tests/abortonerror.nim")
+
+    check exitCode != 0
+    check "Check failed: 1 + 1 == 3" in output
+    check "[FAILED " in output
+
 when unittest2ProcSuite:
   # Verify that suite works under strict push pragmas
   {.push raises: [], gcsafe.}
